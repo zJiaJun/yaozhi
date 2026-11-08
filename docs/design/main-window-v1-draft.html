@@ -1,0 +1,689 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>遥指 Yaozhi · 版本一 · 舞台（修改前）</title>
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<style>
+:root{
+  --ease:cubic-bezier(.16,1,.3,1);
+  --spring:cubic-bezier(.34,1.32,.64,1);
+  --accent:#5b8cff; --accent2:#a46bff; --accent3:#29d3ff;
+  --voice:#ff6b6b; --ok:#3ddc84; --warn:#ffb340;
+  --text:#f5f6f8; --muted:rgba(245,246,248,.62); --faint:rgba(245,246,248,.38);
+  --glass:rgba(255,255,255,.075); --glass-hi:rgba(255,255,255,.14); --glass-line:rgba(255,255,255,.14);
+  --stage:#07080c; --aur1:rgba(76,96,255,.42); --aur2:rgba(150,80,255,.32); --aur3:rgba(0,190,255,.22);
+  --body1:#e9eaee; --body2:#b9bbc2; --body3:#8d9098; --edge:rgba(255,255,255,.55);
+  --key1:#3b3c42; --key2:#121317; --ink:#e9eaee;
+  --shadow:rgba(0,0,0,.65);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","PingFang SC","Helvetica Neue",sans-serif;
+}
+body.light{
+  --text:#16171b; --muted:rgba(22,23,27,.6); --faint:rgba(22,23,27,.36);
+  --glass:rgba(255,255,255,.55); --glass-hi:rgba(255,255,255,.8); --glass-line:rgba(255,255,255,.9);
+  --stage:#eef0f4; --aur1:rgba(120,150,255,.28); --aur2:rgba(190,140,255,.22); --aur3:rgba(110,220,255,.22);
+  --body1:#f6f6f8; --body2:#d4d5da; --body3:#a9abb2; --edge:rgba(255,255,255,.95);
+  --shadow:rgba(40,45,70,.35);
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden}
+body{color:var(--text);-webkit-font-smoothing:antialiased;font-size:13px;user-select:none}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;padding:0}
+
+/* ---------- desktop ---------- */
+.desktop{position:fixed;inset:0;background:
+  radial-gradient(1200px 700px at 15% 10%,#5a6fb0 0%,transparent 60%),
+  radial-gradient(900px 700px at 90% 90%,#a7748f 0%,transparent 60%),
+  radial-gradient(800px 600px at 80% 10%,#6c8fa8 0%,transparent 55%),
+  linear-gradient(160deg,#2b3350,#3b2f45 55%,#4a3a3d)}
+body.light .desktop{background:
+  radial-gradient(1200px 700px at 15% 10%,#c9d6ff 0%,transparent 60%),
+  radial-gradient(900px 700px at 90% 90%,#ffd9e3 0%,transparent 60%),
+  linear-gradient(160deg,#e9edf8,#f4ecf3 55%,#f6efe8)}
+.menubar{position:absolute;top:0;left:0;right:0;height:28px;display:flex;align-items:center;gap:18px;padding:0 14px;
+  background:rgba(20,22,30,.18);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);
+  color:#fff;font-size:13px;z-index:50}
+body.light .menubar{color:#111;background:rgba(255,255,255,.25)}
+.menubar b{font-weight:600}
+.menubar .right{margin-left:auto;display:flex;align-items:center;gap:16px}
+.tray{width:30px;height:22px;border-radius:6px;display:grid;place-items:center;position:relative}
+.tray.open{background:rgba(255,255,255,.22)} body.light .tray.open{background:rgba(0,0,0,.1)}
+.tray svg{width:16px;height:16px}
+.tray .wbars{display:none;gap:1.6px;align-items:center;height:14px}
+.tray .wbars i{width:2px;border-radius:1px;background:currentColor;height:4px;transition:height .08s}
+.tray.live svg{display:none}.tray.live .wbars{display:flex}
+
+/* ---------- window ---------- */
+.win{position:absolute;left:50%;top:calc(50% - 12px);width:min(1180px,calc(100vw - 80px));height:min(720px,calc(100vh - 170px));
+  transform:translate(-50%,-50%);border-radius:22px;overflow:hidden;background:var(--stage);
+  box-shadow:0 40px 120px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.08) inset,0 0 0 .5px rgba(0,0,0,.6);
+  transition:transform .55s var(--ease),opacity .45s var(--ease),filter .45s;transform-origin:center}
+body.light .win{box-shadow:0 40px 120px rgba(60,70,110,.35),0 0 0 1px rgba(255,255,255,.9) inset}
+.win.closed{opacity:0;pointer-events:none;filter:blur(6px)}
+.aurora{position:absolute;inset:-20%;background:
+  radial-gradient(40% 35% at 30% 30%,var(--aur1),transparent 70%),
+  radial-gradient(35% 40% at 75% 60%,var(--aur2),transparent 70%),
+  radial-gradient(30% 30% at 55% 85%,var(--aur3),transparent 70%);
+  filter:blur(30px);animation:drift 22s ease-in-out infinite alternate;opacity:.9}
+@keyframes drift{0%{transform:translate(0,0) rotate(0)}50%{transform:translate(3%,-2%) rotate(6deg)}100%{transform:translate(-2%,3%) rotate(-4deg)}}
+.grain{position:absolute;inset:0;opacity:.06;background-image:radial-gradient(rgba(255,255,255,.6) .5px,transparent .6px);background-size:3px 3px;pointer-events:none}
+body.light .grain{opacity:.08;background-image:radial-gradient(rgba(0,0,0,.4) .5px,transparent .6px)}
+.voice-glow{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .6s var(--ease);
+  background:radial-gradient(45% 55% at 50% 40%,rgba(255,107,107,.14),transparent 70%)}
+.stage.listening .voice-glow{opacity:1}
+
+.glass{background:var(--glass);backdrop-filter:blur(26px) saturate(170%);-webkit-backdrop-filter:blur(26px) saturate(170%);
+  border:1px solid var(--glass-line);box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 12px 34px rgba(0,0,0,.28)}
+body.light .glass{box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 12px 34px rgba(70,80,120,.14)}
+
+.lights{position:absolute;left:18px;top:18px;display:flex;gap:8px;z-index:10}
+.lights i{width:12px;height:12px;border-radius:50%;background:#ff5f57;display:block;position:relative;cursor:pointer}
+.lights i:nth-child(2){background:#febc2e}.lights i:nth-child(3){background:#28c840}
+.lights:hover i::after{position:absolute;inset:0;display:grid;place-items:center;font-size:9px;font-weight:800;color:rgba(0,0,0,.55);line-height:12px;text-align:center}
+.lights:hover i:nth-child(1)::after{content:"×"}.lights:hover i:nth-child(2)::after{content:"−"}.lights:hover i:nth-child(3)::after{content:"+"}
+
+.device-chip{position:absolute;left:84px;top:11px;z-index:10;display:flex;align-items:center;gap:8px;padding:6px 12px 6px 8px;border-radius:999px}
+.device-chip .pulse{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 0 rgba(61,220,132,.6);animation:pulse 2.4s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(61,220,132,.55)}70%{box-shadow:0 0 0 7px rgba(61,220,132,0)}100%{box-shadow:0 0 0 0 rgba(61,220,132,0)}}
+.device-chip .n{font-weight:600}.device-chip .s{color:var(--muted)}
+
+.nav{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:10;display:flex;padding:4px;border-radius:999px;gap:2px}
+.nav button{position:relative;z-index:1;padding:7px 16px;border-radius:999px;color:var(--muted);font-weight:500;transition:color .3s}
+.nav button.on{color:var(--text)}
+.nav .ind{position:absolute;top:4px;bottom:4px;border-radius:999px;background:var(--glass-hi);box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 2px 8px rgba(0,0,0,.18);transition:left .55s var(--spring),width .55s var(--spring)}
+.tag{font-size:10px;padding:1px 6px;border-radius:5px;background:rgba(164,107,255,.22);color:#c9a6ff;font-weight:700;margin-left:4px;vertical-align:1px}
+body.light .tag{color:#8a4be6;background:rgba(164,107,255,.15)}
+
+/* ---------- stage & hero ---------- */
+.stage{position:absolute;inset:0}
+.hero{position:absolute;left:50%;top:50%;width:var(--hw,200px);transform:translate(-50%,-50%) translate(var(--hx,0px),var(--hy,0px)) scale(var(--hs,1));
+  transition:transform 1s var(--spring);z-index:3}
+.float{animation:float 7s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(-5px)}50%{transform:translateY(6px)}}
+.tilt{transform-style:preserve-3d;will-change:transform}
+.floor{position:absolute;left:50%;bottom:-36px;width:70%;height:40px;transform:translateX(-50%);border-radius:50%;
+  background:radial-gradient(closest-side,var(--shadow),transparent);filter:blur(6px);animation:floor 7s ease-in-out infinite}
+@keyframes floor{0%,100%{transform:translateX(-50%) scale(1);opacity:.9}50%{transform:translateX(-50%) scale(.86);opacity:.65}}
+.hero svg{display:block;width:100%;overflow:visible}
+.k,.kw{transform-box:fill-box;transform-origin:center;transition:transform .16s var(--spring),filter .2s}
+.k{cursor:pointer}
+.kd:hover{filter:brightness(1.3)}.kl:hover{filter:brightness(.96)}
+.k.down,.kw.down{transform:scale(.9)}
+.k.down{filter:brightness(1.6) drop-shadow(0 0 6px rgba(91,140,255,.9))}
+.k.sel{stroke:var(--accent);stroke-width:2}
+.kw{fill:transparent;cursor:pointer}
+.kw.down{fill:rgba(91,140,255,.45)}
+.kw.sel{fill:rgba(91,140,255,.32)}
+.kw:hover{fill:rgba(255,255,255,.06)}
+.g{stroke:var(--ink);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;pointer-events:none;opacity:.88}
+.gt{fill:var(--ink);font-size:9px;font-weight:700;text-anchor:middle;pointer-events:none;letter-spacing:.3px;opacity:.88}
+#k-voice.live{fill:url(#k-voiceg);stroke:#b3262b;filter:drop-shadow(0 0 10px rgba(255,107,107,.9))}
+.rings circle{fill:none;stroke:var(--voice);stroke-width:1.4;transform-box:fill-box;transform-origin:center;opacity:0}
+.stage.listening .rings circle{animation:ring 1.8s cubic-bezier(.2,.7,.3,1) infinite}
+.stage.listening .rings circle:nth-child(2){animation-delay:.6s}.stage.listening .rings circle:nth-child(3){animation-delay:1.2s}
+@keyframes ring{0%{transform:scale(1);opacity:.75}100%{transform:scale(4.2);opacity:0}}
+.ready-dot{fill:var(--voice);opacity:.0;transition:opacity .4s}
+.stage[data-page="overview"] .ready-dot,.stage[data-page="voice"] .ready-dot{opacity:.9;animation:breathe 3.2s ease-in-out infinite}
+.stage.listening .ready-dot{opacity:0;animation:none}
+@keyframes breathe{0%,100%{opacity:.25}50%{opacity:.95}}
+
+/* overlay lines */
+.overlay{position:absolute;inset:0;pointer-events:none;z-index:2;overflow:visible}
+.overlay path{fill:none}
+.flow-base{stroke:var(--glass-line);stroke-width:1.2;stroke-dasharray:2 6;opacity:0;transition:opacity .6s}
+.stage[data-page="overview"] .flow-base{opacity:.9}
+.flow-live{stroke:url(#flowg);stroke-width:2.6;stroke-linecap:round;stroke-dasharray:60 420;opacity:0;transition:opacity .4s}
+.stage.listening .flow-live,.stage.draining .flow-live{opacity:1;animation:dash 1s linear infinite}
+.stage.draining .flow-live{animation-duration:.5s}
+@keyframes dash{from{stroke-dashoffset:480}to{stroke-dashoffset:0}}
+.lead{stroke:var(--glass-line);stroke-width:1;opacity:0;transition:opacity .5s}
+.stage[data-page="keys"] .lead{opacity:1}
+.lead.hot{stroke:var(--accent);stroke-width:1.6}
+
+/* destination chip */
+.dest{position:absolute;z-index:4;display:flex;align-items:center;gap:12px;padding:12px 16px 12px 12px;border-radius:18px;
+  opacity:0;transform:translate(14px,-50%) scale(.96);transition:opacity .6s var(--ease),transform .8s var(--spring);pointer-events:none}
+.stage[data-page="overview"] .dest{opacity:1;transform:translate(0,-50%) scale(1);pointer-events:auto}
+.dest .app{width:40px;height:40px;border-radius:11px;display:grid;place-items:center;font-weight:800;font-size:18px;color:#fff;
+  background:linear-gradient(145deg,#7b8cff,#a46bff);box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 6px 16px rgba(91,140,255,.35)}
+.dest .t{font-weight:600;font-size:14px}.dest .s{color:var(--muted);font-size:12px}
+.dest.got{animation:got .7s var(--spring)}
+@keyframes got{0%{transform:translate(0,-50%) scale(1)}35%{transform:translate(0,-50%) scale(1.07)}100%{transform:translate(0,-50%) scale(1)}}
+.src{position:absolute;z-index:4;max-width:220px;opacity:0;transform:translate(-14px,-50%);transition:opacity .6s var(--ease),transform .8s var(--spring)}
+.stage[data-page="overview"] .src{opacity:1;transform:translate(0,-50%)}
+.src h1{margin:0 0 8px;font-size:34px;line-height:1.1;font-weight:700;letter-spacing:-.5px}
+.src p{margin:0;color:var(--muted);font-size:14px;line-height:1.55}
+.src .stats{margin-top:20px;display:flex;gap:18px}
+.src .stats div{font-variant-numeric:tabular-nums}
+.src .stats b{display:block;font-size:20px;font-weight:600}
+.src .stats span{color:var(--faint);font-size:11.5px}
+
+/* capsule */
+.capsule{position:absolute;left:50%;bottom:28px;z-index:6;height:52px;border-radius:999px;display:flex;align-items:center;gap:0;
+  padding:0 20px 0 14px;transform:translateX(-50%);transition:width .55s var(--spring),opacity .5s,transform .7s var(--spring);white-space:nowrap;overflow:hidden}
+.stage[data-page="keys"] .capsule,.stage[data-page="device"] .capsule{opacity:0;transform:translate(-50%,30px);pointer-events:none}
+.capsule .mic{margin-right:12px;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:rgba(255,107,107,.18);color:var(--voice);flex:none;transition:.3s}
+.stage.listening .capsule .mic{background:var(--voice);color:#fff;box-shadow:0 0 18px rgba(255,107,107,.7)}
+.capsule .mic svg{width:15px;height:15px}
+.capsule canvas{width:0;height:28px;transition:width .5s var(--spring)}
+.stage.listening .capsule canvas,.stage.draining .capsule canvas{width:150px;margin-right:12px}
+.capsule .txt{font-weight:500}
+.capsule .time{font-variant-numeric:tabular-nums;color:var(--muted);width:0;overflow:hidden;transition:width .4s}
+.stage.listening .capsule .time{width:38px;margin-right:10px}
+.capsule .check{width:0;overflow:hidden;color:var(--ok);transition:width .35s var(--spring)}
+.capsule.done .check{width:18px;margin-right:8px}
+.capsule .check svg{width:16px;height:16px;display:block}
+.capsule .check path{stroke-dasharray:24;stroke-dashoffset:24}
+.capsule.done .check path{animation:draw .5s .1s var(--ease) forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+
+/* callout */
+.callout{position:absolute;z-index:7;padding:7px 12px;border-radius:12px;font-weight:600;pointer-events:none;white-space:nowrap;
+  animation:callout 1.3s var(--ease) forwards}
+.callout small{color:var(--muted);font-weight:500;margin-right:6px}
+.callout kbd{font-family:"SF Mono",Menlo,monospace;font-size:12px;padding:1px 6px;border-radius:5px;background:var(--glass-hi);margin-left:2px}
+@keyframes callout{0%{opacity:0;transform:translate(-4px,4px) scale(.9)}15%{opacity:1;transform:translate(0,0) scale(1)}75%{opacity:1;transform:translate(0,-8px)}100%{opacity:0;transform:translate(0,-18px) scale(.98)}}
+
+/* key labels (keys page) */
+.klabel{position:absolute;z-index:5;padding:8px 12px;border-radius:13px;min-width:150px;cursor:pointer;opacity:0;transform:scale(.94);
+  transition:opacity .45s var(--ease),transform .55s var(--spring),box-shadow .25s,border-color .25s}
+.stage[data-page="keys"] .klabel{opacity:1;transform:scale(1)}
+.klabel .n{font-size:11.5px;color:var(--muted)}.klabel .a{font-weight:600;margin-top:1px}
+.klabel.sel{border-color:var(--accent);box-shadow:0 0 0 3px rgba(91,140,255,.25),0 12px 34px rgba(0,0,0,.28)}
+.klabel.flash{animation:lflash .5s var(--ease)}
+@keyframes lflash{0%{transform:scale(1)}40%{transform:scale(1.06)}100%{transform:scale(1)}}
+
+/* side panels */
+.panel{position:absolute;right:22px;top:70px;bottom:22px;width:360px;border-radius:22px;z-index:8;padding:22px;overflow:auto;
+  opacity:0;transform:translateX(30px) scale(.98);pointer-events:none;transition:opacity .45s var(--ease),transform .7s var(--spring)}
+.panel.on{opacity:1;transform:none;pointer-events:auto}
+.panel h2{margin:0 0 4px;font-size:22px;letter-spacing:-.2px}
+.panel .lead2{color:var(--muted);margin:0 0 18px;line-height:1.55}
+.sec{font-size:11.5px;color:var(--faint);font-weight:600;letter-spacing:.4px;margin:18px 2px 8px}
+.rows{border-radius:14px;background:rgba(255,255,255,.05);border:1px solid var(--glass-line)}
+body.light .rows{background:rgba(255,255,255,.5)}
+.r{display:flex;align-items:center;gap:10px;padding:11px 14px;min-height:46px}
+.r+.r{border-top:1px solid var(--glass-line)}
+.r .grow{flex:1;min-width:0}.r .sub{color:var(--muted);font-size:12px;margin-top:1px}
+.val{color:var(--muted);display:flex;align-items:center;gap:6px}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--ok);flex:none}
+.sw{width:38px;height:22px;border-radius:11px;background:rgba(120,120,128,.4);position:relative;flex:none;transition:background .3s}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 2px 4px rgba(0,0,0,.3);transition:left .4s var(--spring)}
+.sw.on{background:var(--ok)}.sw.on::after{left:18px}
+.slider{flex:1;height:4px;border-radius:2px;background:rgba(120,120,128,.35);position:relative;max-width:150px}
+.slider i{position:absolute;left:0;top:0;bottom:0;border-radius:2px;background:linear-gradient(90deg,var(--accent),var(--accent2))}
+.slider b{position:absolute;top:50%;width:18px;height:18px;border-radius:50%;background:#fff;transform:translate(-50%,-50%);box-shadow:0 2px 6px rgba(0,0,0,.35)}
+.pbtn{border-radius:10px;padding:8px 14px;background:var(--glass-hi);border:1px solid var(--glass-line);font-weight:500;transition:transform .2s var(--spring)}
+.pbtn:active{transform:scale(.96)}
+.pbtn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border-color:transparent;box-shadow:0 6px 18px rgba(91,140,255,.35)}
+.chain{display:flex;align-items:center;gap:6px;padding:14px}
+.chain .nd{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;background:var(--glass-hi);position:relative}
+.chain .nd svg{width:15px;height:15px}
+.chain .nd::after{content:"";position:absolute;right:-3px;bottom:-3px;width:9px;height:9px;border-radius:50%;background:var(--ok);border:2px solid var(--stage)}
+.chain .ln{flex:1;height:2px;border-radius:1px;background:var(--glass-line);position:relative;overflow:hidden}
+.chain .ln::after{content:"";position:absolute;inset:0;width:40%;left:-40%;background:linear-gradient(90deg,transparent,var(--accent3),transparent);opacity:0}
+.stage.listening .chain .ln::after{opacity:1;animation:slide .8s linear infinite}
+@keyframes slide{to{left:100%}}
+.mini-meter{height:6px;border-radius:3px;background:rgba(120,120,128,.3);overflow:hidden;margin:0 14px 14px}
+.mini-meter i{display:block;height:100%;width:0;border-radius:3px;background:linear-gradient(90deg,var(--ok),#c6f36b 70%,var(--warn));transition:width .08s}
+
+/* key editor */
+.seg{position:relative;display:flex;padding:3px;border-radius:12px;background:rgba(120,120,128,.18)}
+.seg button{flex:1;position:relative;z-index:1;padding:7px 0;border-radius:9px;color:var(--muted);font-weight:500;transition:color .3s}
+.seg button.on{color:var(--text)}
+.seg .ind{position:absolute;top:3px;bottom:3px;border-radius:9px;background:var(--glass-hi);box-shadow:0 2px 8px rgba(0,0,0,.18);transition:left .5s var(--spring),width .5s var(--spring)}
+.bigaction{margin:16px 0 4px;padding:22px;border-radius:16px;text-align:center;background:rgba(255,255,255,.05);border:1px solid var(--glass-line)}
+body.light .bigaction{background:rgba(255,255,255,.55)}
+.bigaction .v{font-size:26px;font-weight:700;letter-spacing:-.3px;transition:opacity .25s,transform .35s var(--spring)}
+.bigaction .v.swap{opacity:0;transform:translateY(6px)}
+.bigaction .c{color:var(--muted);margin-top:4px;font-size:12px}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.tile{padding:12px 8px;border-radius:13px;text-align:center;background:rgba(255,255,255,.05);border:1px solid var(--glass-line);transition:transform .25s var(--spring),border-color .25s}
+body.light .tile{background:rgba(255,255,255,.5)}
+.tile:hover{transform:translateY(-2px);border-color:var(--accent)}
+.tile .i{font-size:18px;margin-bottom:4px}.tile span{font-size:12px;color:var(--muted)}
+.apps{display:flex;gap:6px;flex-wrap:wrap}
+.apps span{padding:5px 11px;border-radius:999px;background:rgba(255,255,255,.07);border:1px solid var(--glass-line);font-size:12px}
+.apps span.on{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;border-color:transparent}
+
+/* device page */
+.perm .ck{width:22px;height:22px;border-radius:50%;background:rgba(61,220,132,.18);display:grid;place-items:center;color:var(--ok)}
+.perm .ck path{stroke-dasharray:20;stroke-dashoffset:20}
+.panel.on .perm .ck path{animation:draw .5s var(--ease) forwards}
+.panel.on .perm .r:nth-child(2) .ck path{animation-delay:.15s}.panel.on .perm .r:nth-child(3) .ck path{animation-delay:.3s}
+
+/* flyout */
+.flyout{position:absolute;top:34px;width:330px;border-radius:20px;padding:14px;z-index:60;opacity:0;transform:translateY(-8px) scale(.97);transform-origin:top right;
+  pointer-events:none;transition:opacity .35s var(--ease),transform .5s var(--spring);color:var(--text)}
+.flyout.on{opacity:1;transform:none;pointer-events:auto}
+.flyout{background:rgba(30,32,40,.6)} body.light .flyout{background:rgba(255,255,255,.6)}
+.fy-h{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.fy-h .ico{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:linear-gradient(145deg,#4f5568,#262a35);box-shadow:inset 0 1px 0 rgba(255,255,255,.18)}
+.fy-h .ico svg{width:18px;height:18px;color:#fff}
+.fy-h .t{font-weight:600;font-size:14px}.fy-h .s{color:var(--muted);font-size:12px;display:flex;align-items:center;gap:6px}
+.fy-cap{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.06);border:1px solid var(--glass-line);margin-bottom:10px;min-height:48px}
+body.light .fy-cap{background:rgba(255,255,255,.55)}
+.fy-cap .mic{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:rgba(255,107,107,.18);color:var(--voice);flex:none}
+.fy-cap.live .mic{background:var(--voice);color:#fff}
+.fy-cap canvas{height:22px;width:0;transition:width .4s var(--spring)}
+.fy-cap.live canvas{width:120px}
+.fy-row{display:flex;align-items:center;gap:10px;padding:9px 4px}
+.fy-row+.fy-row{border-top:1px solid var(--glass-line)}
+.fy-row .grow{flex:1}.fy-row .sub{color:var(--muted);font-size:11.5px}
+.fy-btns{display:flex;gap:8px;margin-top:12px}
+.fy-btns .pbtn{flex:1;text-align:center}
+
+/* legend */
+.legend{position:absolute;left:50%;transform:translateX(-50%);bottom:14px;z-index:40;padding:10px 16px;border-radius:14px;font-size:12px;color:var(--text);width:max-content;max-width:calc(100vw - 40px);line-height:1.6;text-align:center}
+.legend kbd{font-family:"SF Mono",Menlo,monospace;font-size:11px;padding:1px 5px;border-radius:4px;background:var(--glass-hi);border:1px solid var(--glass-line)}
+.legend button,.legend a{text-decoration:underline;color:var(--accent3)}
+body.light .legend button{color:#3a5bd9}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="i-remote" viewBox="0 0 24 24"><rect x="8" y="2.5" width="8" height="19" rx="4" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="9" r="2.3" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="15.4" r="1" fill="currentColor"/><circle cx="12" cy="18.2" r="1" fill="currentColor"/></symbol>
+    <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-chip" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M9 3v3M15 3v3M9 18v3M15 18v3M3 9h3M3 15h3M18 9h3M18 15h3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+    <symbol id="i-bh" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="12" r="3.5" fill="currentColor"/></symbol>
+    <symbol id="i-text" viewBox="0 0 24 24"><path d="M5 6h14M12 6v12M8 18h8" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  </defs>
+</svg>
+
+<div class="desktop">
+  <div class="menubar">
+    <svg width="14" height="16" viewBox="0 0 14 17"><path fill="currentColor" d="M11.6 9c0-2 1.6-3 1.7-3-1-1.4-2.4-1.6-2.9-1.6-1.2-.1-2.4.7-3 .7s-1.6-.7-2.6-.7C3.5 4.4 2.2 5.2 1.5 6.4c-1.5 2.6-.4 6.4 1 8.5.7 1 1.5 2.1 2.6 2.1 1 0 1.4-.7 2.7-.7s1.6.7 2.7.7 1.8-1 2.5-2.1c.8-1.1 1.1-2.2 1.1-2.3 0 0-2.5-.9-2.5-3.6zM9.6 3.1C10.2 2.4 10.6 1.4 10.5.5c-.8 0-1.8.5-2.4 1.2-.5.6-1 1.6-.9 2.5.9.1 1.8-.4 2.4-1.1z"/></svg>
+    <b>遥指</b><span>文件</span><span>编辑</span><span>窗口</span><span>帮助</span>
+    <div class="right">
+      <span>Wi-Fi</span>
+      <div class="tray" id="tray" title="遥指"><svg><use href="#i-remote"/></svg><span class="wbars" id="traybars"><i></i><i></i><i></i><i></i><i></i></span></div>
+      <span id="clock">周五 21:40</span>
+    </div>
+  </div>
+
+  <div class="win" id="win">
+    <div class="stage" id="stage" data-page="overview">
+      <div class="aurora"></div><div class="voice-glow"></div><div class="grain"></div>
+
+      <svg class="overlay" id="overlay">
+        <defs>
+          <linearGradient id="flowg" x1="0" x2="1"><stop offset="0" stop-color="#ff6b6b"/><stop offset=".5" stop-color="#a46bff"/><stop offset="1" stop-color="#29d3ff"/></linearGradient>
+        </defs>
+        <path class="flow-base" id="flowBase"/>
+        <path class="flow-live" id="flowLive"/>
+        <g id="leads"></g>
+      </svg>
+
+      <div class="src" id="src">
+        <h1>按住，说话。</h1>
+        <p>按住遥控器上的语音键说一句，松开，文字就出现在你正在输入的地方。</p>
+        <div class="stats"><div><b id="st-n">12</b><span>今天说话</span></div><div><b>3.4 秒</b><span>平均时长</span></div><div><b>90 ms</b><span>松开后收尾</span></div></div>
+      </div>
+
+      <div class="hero" id="hero"><div class="float"><div class="tilt" id="tilt"><div id="remoteSlot"></div></div><div class="floor"></div></div></div>
+
+      <div class="dest glass" id="dest">
+        <div class="app">T</div>
+        <div><div class="t">Typeless</div><div class="s">经 yaozhi-mic 收音 · 识别和上屏由它完成</div></div>
+      </div>
+
+      <div class="capsule glass" id="capsule">
+        <span class="mic"><svg><use href="#i-mic"/></svg></span>
+        <canvas id="wave" width="300" height="56"></canvas>
+        <span class="time" id="time">0:00</span>
+        <span class="check"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+        <span class="txt" id="captxt">按住遥控器上的语音键说话</span>
+      </div>
+
+      <div id="labels"></div>
+
+      <!-- voice panel -->
+      <aside class="panel glass" data-panel="voice">
+        <h2>语音输入</h2>
+        <p class="lead2">按住语音键说话，松开后遥指等声音全部送完，再通知 Typeless 结束。遥指不识别、不保存语音。</p>
+        <div class="rows">
+          <div class="r"><div class="grow">启用语音输入</div><button class="sw on"></button></div>
+          <div class="r"><div class="grow">输入法</div><span class="val">Typeless ›</span></div>
+          <div class="r"><div class="grow"><div>麦克风</div><div class="sub">Typeless 里也选它</div></div><span class="val"><i class="dot"></i>yaozhi-mic</span></div>
+          <div class="r"><div class="grow">音量增益</div><div class="slider"><i style="width:38%"></i><b style="left:38%"></b></div><span class="val" style="width:46px;justify-content:flex-end">+6 dB</span></div>
+        </div>
+        <div class="sec">声音的去向</div>
+        <div class="rows">
+          <div class="chain"><span class="nd"><svg><use href="#i-remote"/></svg></span><span class="ln"></span><span class="nd"><svg><use href="#i-chip"/></svg></span><span class="ln"></span><span class="nd"><svg><use href="#i-bh"/></svg></span><span class="ln"></span><span class="nd"><svg><use href="#i-text"/></svg></span></div>
+          <div class="mini-meter"><i id="pmeter"></i></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:12px"><button class="pbtn">播放测试音</button><button class="pbtn">重新检查</button></div>
+      </aside>
+
+      <!-- keys panel -->
+      <aside class="panel glass" data-panel="keys">
+        <h2 id="ke-name">确定键</h2>
+        <p class="lead2" id="ke-desc">在遥控器上点一个键，或直接按下实体键。<span class="tag">M2</span></p>
+        <div class="seg" id="gseg"><span class="ind"></span><button class="on" data-g="single">单击</button><button data-g="double">双击</button><button data-g="long">长按</button></div>
+        <div class="bigaction"><div class="v" id="ke-v">Return</div><div class="c" id="ke-c">发送按键</div></div>
+        <div class="sec">换成</div>
+        <div class="tiles">
+          <div class="tile"><div class="i">⌘</div><span>快捷键</span></div>
+          <div class="tile"><div class="i">▢</div><span>打开 App</span></div>
+          <div class="tile"><div class="i">⇥</div><span>切换应用</span></div>
+          <div class="tile"><div class="i">▶︎</div><span>媒体控制</span></div>
+          <div class="tile"><div class="i">☾</div><span>系统动作</span></div>
+          <div class="tile"><div class="i">—</div><span>不做事</span></div>
+        </div>
+        <div class="sec">方案 · 跟随前台 App</div>
+        <div class="apps"><span class="on">通用</span><span>Safari</span><span>Keynote</span><span>访达</span><span>＋</span></div>
+      </aside>
+
+      <!-- device panel -->
+      <aside class="panel glass" data-panel="device">
+        <h2>小米蓝牙遥控器 2 Pro</h2>
+        <p class="lead2">型号 RC003 · 语音通道 ATVV 1.0 · 16 kHz</p>
+        <div class="rows">
+          <div class="r"><div class="grow">连接</div><span class="val"><i class="dot"></i>已连接</span></div>
+          <div class="r"><div class="grow">断线后自动重连</div><button class="sw on"></button></div>
+          <div class="r"><div class="grow">电量</div><span class="val">—</span></div>
+        </div>
+        <div class="sec">权限</div>
+        <div class="rows perm">
+          <div class="r"><span class="ck"><svg width="14" height="14" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span><div class="grow"><div>蓝牙</div><div class="sub">连接遥控器、接收语音</div></div></div>
+          <div class="r"><span class="ck"><svg width="14" height="14" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span><div class="grow"><div>辅助功能</div><div class="sub">替你点 Fn、执行按键动作</div></div></div>
+          <div class="r"><span class="ck"><svg width="14" height="14" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span><div class="grow"><div>输入监控</div><div class="sub">读取遥控器按键</div></div></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:14px"><button class="pbtn">配对新遥控器</button><button class="pbtn">导出诊断</button></div>
+      </aside>
+    </div>
+
+    <div class="lights" id="lights"><i id="closeBtn"></i><i></i><i></i></div>
+    <div class="device-chip glass"><span class="pulse"></span><span class="n">小米蓝牙遥控器 2 Pro</span><span class="s">已连接</span></div>
+    <nav class="nav glass" id="nav"><span class="ind"></span>
+      <button class="on" data-p="overview">概览</button><button data-p="voice">语音</button><button data-p="keys">按键<span class="tag">M2</span></button><button data-p="device">设备</button>
+    </nav>
+  </div>
+
+  <div class="flyout glass" id="flyout">
+    <div class="fy-h"><span class="ico"><svg><use href="#i-remote"/></svg></span><div style="flex:1"><div class="t">遥指</div><div class="s"><i class="dot"></i>小米蓝牙遥控器 2 Pro</div></div></div>
+    <div class="fy-cap" id="fycap"><span class="mic"><svg width="14" height="14"><use href="#i-mic"/></svg></span><canvas id="fywave" width="240" height="44"></canvas><span id="fytxt">按住语音键说话</span></div>
+    <div class="fy-row"><div class="grow">语音输入<div class="sub">Typeless · yaozhi-mic</div></div><button class="sw on"></button></div>
+    <div class="fy-row"><div class="grow">按键映射 <span class="tag">M2</span><div class="sub">方案：通用</div></div><button class="sw on"></button></div>
+    <div class="fy-btns"><button class="pbtn primary" id="openWin">打开遥指</button><button class="pbtn">退出</button></div>
+  </div>
+
+  <div class="legend glass" id="legend">
+    <b>试一试：</b>按住 <kbd>空格</kbd> = 按住语音键；<kbd>↑↓←→</kbd> <kbd>回车</kbd> <kbd>Esc</kbd> <kbd>H</kbd> 主页 <kbd>M</kbd> 菜单 <kbd>+</kbd><kbd>−</kbd> 音量。也可以直接点遥控器。
+    点窗口左上角红色按钮关闭窗口，看它收进菜单栏。 <button id="themeBtn">切换浅色 / 深色</button><br>
+    <b>版本：</b>一 · 舞台（当前） · <a href="main-window-v2.html">二 · 灵动岛</a> · <a href="main-window-v3.html">三 · 点阵</a>
+  </div>
+</div>
+
+<script src="rc003.js"></script>
+<script>
+// ---------------- remote (shared RC003 drawing, rc003.js) ----------------
+document.getElementById('remoteSlot').innerHTML = rc003SVG({prefix:'k-'});
+document.querySelector('#remoteSlot svg').id = 'remote';
+
+const KEYS = {
+  power:{name:'电源键', a:{single:'锁屏',double:'未设置',long:'未设置'}, c:'遥指先把它转成 F20，防止误触关机', side:'L'},
+  voice:{name:'语音键', a:{single:'语音输入',double:'—',long:'按住说话'}, c:'固定用于语音输入', side:'R', fixed:true},
+  up:{name:'上键', a:{single:'↑',double:'未设置',long:'连续 ↑'}},
+  down:{name:'下键', a:{single:'↓',double:'未设置',long:'连续 ↓'}},
+  left:{name:'左键', a:{single:'←',double:'⌃← 上一个桌面',long:'连续 ←'}},
+  right:{name:'右键', a:{single:'→',double:'⌃→ 下一个桌面',long:'连续 →'}},
+  ok:{name:'确定键', a:{single:'Return',double:'播放 / 暂停',long:'⌥⌘L'}, side:'R'},
+  back:{name:'返回键', a:{single:'Esc',double:'⌘W',long:'未设置'}, side:'L'},
+  home:{name:'主页键', a:{single:'显示桌面',double:'⌘Tab',long:'启动台'}, side:'L'},
+  menu:{name:'菜单键', a:{single:'调度中心',double:'未设置',long:'未设置'}, side:'L'},
+  volup:{name:'音量 +', a:{single:'音量 +',double:'未设置',long:'连续 +'}, side:'R'},
+  voldown:{name:'音量 −', a:{single:'音量 −',double:'未设置',long:'连续 −'}},
+  tv:{name:'TV 键', a:{single:'打开 Keynote',double:'未设置',long:'未设置'}, side:'R'},
+};
+const LABELS = [ // key-page labels: anchor key, title, which keys it covers
+  {k:'power', t:'电源键', v:'锁屏', side:'L'},
+  {k:'back', t:'返回键', v:'Esc', side:'L'},
+  {k:'home', t:'主页键', v:'显示桌面', side:'L'},
+  {k:'menu', t:'菜单键', v:'调度中心', side:'L'},
+  {k:'voice', t:'语音键', v:'按住说话 · 固定', side:'R'},
+  {k:'ok', t:'方向键 · 确定', v:'↑ ↓ ← →  ·  Return', side:'R', group:['up','down','left','right','ok']},
+  {k:'volup', t:'音量键', v:'系统音量 ±', side:'R', group:['volup','voldown']},
+  {k:'tv', t:'TV 键', v:'打开 Keynote', side:'R'},
+];
+
+// ---------------- elements ----------------
+const $ = s => document.querySelector(s);
+const stage=$('#stage'), hero=$('#hero'), tilt=$('#tilt'), win=$('#win');
+const remote=$('#remote'), overlay=$('#overlay');
+let page='overview';
+
+// ---------------- layout per page ----------------
+function layout(){
+  const W=stage.clientWidth, H=stage.clientHeight;
+  const hw = Math.min(H*0.68*200/840, 170);
+  hero.style.setProperty('--hw', hw+'px');
+  const cfg = {
+    overview:{x:0, y:-8, s:1},
+    voice:{x:-(W*0.2), y:0, s:0.92},
+    keys:{x:-(W*0.14), y:6, s:1.04},
+    device:{x:-(W*0.2), y:0, s:0.86},
+  }[page];
+  hero.style.setProperty('--hx', cfg.x+'px');
+  hero.style.setProperty('--hy', cfg.y+'px');
+  hero.style.setProperty('--hs', cfg.s);
+  const src=$('#src'); src.style.left=(W*0.07)+'px'; src.style.top=(H*0.47)+'px';
+  const dest=$('#dest'); dest.style.left=(W*0.66)+'px'; dest.style.top=(H*0.47)+'px';
+}
+function setPage(p){
+  page=p; stage.dataset.page=p;
+  document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on', b.dataset.p===p));
+  moveInd($('#nav'), $('#nav button.on'));
+  document.querySelectorAll('.panel').forEach(x=>x.classList.toggle('on', x.dataset.panel===p));
+  remote.querySelectorAll('.sel').forEach(n=>n.classList.remove('sel'));
+  if (p==='voice') remote.querySelector('[data-k=voice]').classList.add('sel');
+  if (p==='keys') selectKey(currentKey);
+  layout();
+}
+function moveInd(container, btn){
+  const ind=container.querySelector('.ind'); if(!btn||!ind) return;
+  ind.style.left=btn.offsetLeft+'px'; ind.style.width=btn.offsetWidth+'px';
+}
+document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>setPage(b.dataset.p));
+
+// ---------------- geometry helpers ----------------
+function keyBox(k){
+  const el=remote.querySelector(`[data-k="${k}"]`); if(!el) return null;
+  const r=el.getBoundingClientRect(), s=stage.getBoundingClientRect();
+  return {x:r.left-s.left+r.width/2, y:r.top-s.top+r.height/2, w:r.width, h:r.height};
+}
+function boxOf(el){ const r=el.getBoundingClientRect(), s=stage.getBoundingClientRect(); return {l:r.left-s.left, t:r.top-s.top, r:r.right-s.left, b:r.bottom-s.top, w:r.width, h:r.height}; }
+
+// ---------------- key labels (keys page) ----------------
+const labelsEl=$('#labels');
+LABELS.forEach(L=>{
+  const d=document.createElement('div'); d.className='klabel glass'; d.dataset.k=L.k;
+  d.innerHTML=`<div class="n">${L.t}</div><div class="a">${L.v}</div>`;
+  d.onclick=()=>selectKey(L.k);
+  labelsEl.appendChild(d); L.el=d;
+  const p=document.createElementNS('http://www.w3.org/2000/svg','path'); p.setAttribute('class','lead'); $('#leads').appendChild(p); L.path=p;
+});
+function placeLabels(){
+  const rb = boxOf(remote);
+  ['L','R'].forEach(side=>{
+    const items = LABELS.filter(L=>L.side===side).map(L=>({L, kb:keyBox(L.k), w:L.el.offsetWidth, h:L.el.offsetHeight})).filter(o=>o.kb);
+    items.sort((a,b)=>a.kb.y-b.kb.y);
+    let prev=-Infinity;
+    items.forEach(o=>{ o.top=Math.max(o.kb.y-o.h/2, prev+10); prev=o.top+o.h; });
+    // pull the column back up if it ran past the remote's bottom
+    const over = prev - (rb.b + 10);
+    if (over>0) items.forEach(o=>o.top-=over);
+    items.forEach(o=>{
+      const {L,kb,w,h}=o;
+      const x = side==='L' ? rb.l - w - 64 : rb.r + 64;
+      const ax = side==='L' ? x + w : x, ay = o.top + h/2;
+      L.el.style.left=x+'px'; L.el.style.top=o.top+'px';
+      const sx = side==='L' ? kb.x - kb.w/2 : kb.x + kb.w/2;
+      const mx = (sx+ax)/2;
+      L.path.setAttribute('d',`M${sx},${kb.y} C${mx},${kb.y} ${mx},${ay} ${ax},${ay}`);
+    });
+  });
+}
+
+// ---------------- flow path (overview) ----------------
+function placeFlow(){
+  const kb=keyBox('voice'), d=boxOf($('#dest'));
+  if(!kb) return;
+  const sx=kb.x+kb.w/2, sy=kb.y, ex=d.l-6, ey=d.t+d.h/2;
+  const c2=Math.max(sx+60, ex-(ex-sx)*0.55);
+  const dpath=`M${sx},${sy} C${sx+70},${sy-50} ${c2},${ey} ${ex},${ey}`;
+  $('#flowBase').setAttribute('d',dpath); $('#flowLive').setAttribute('d',dpath);
+}
+
+// ---------------- tilt + spec ----------------
+let tx=0, ty=0, mx=0, my=0;
+window.addEventListener('pointermove', e=>{ const r=win.getBoundingClientRect(); mx=((e.clientX-r.left)/r.width-.5)*2; my=((e.clientY-r.top)/r.height-.5)*2; });
+
+// ---------------- frame loop ----------------
+function frame(){
+  tx += (mx-tx)*0.06; ty += (my-ty)*0.06;
+  const k = page==='keys' ? 0.35 : 1;
+  tilt.style.transform=`perspective(900px) rotateY(${tx*7*k}deg) rotateX(${-ty*5*k}deg)`;
+  $('#k-spec').setAttribute('x', 62 + tx*26);
+  placeFlow(); placeLabels();
+  drawWave();
+  requestAnimationFrame(frame);
+}
+
+// ---------------- voice session demo ----------------
+let vstate='idle', vstart=0, level=0, targetLevel=0, doneTimer=null;
+const cap=$('#capsule'), captxt=$('#captxt'), timeEl=$('#time');
+const fycap=$('#fycap'), fytxt=$('#fytxt'), tray=$('#tray');
+function voiceDown(){
+  if (vstate==='listening') return;
+  clearTimeout(doneTimer);
+  vstate='listening'; vstart=performance.now();
+  stage.classList.add('listening'); stage.classList.remove('draining'); cap.classList.remove('done');
+  remote.querySelector('#k-voice').classList.add('live','down');
+  captxt.textContent='正在收音'; fycap.classList.add('live'); fytxt.textContent='正在收音';
+  tray.classList.add('live');
+}
+function voiceUp(){
+  if (vstate!=='listening') return;
+  vstate='draining';
+  stage.classList.remove('listening'); stage.classList.add('draining');
+  remote.querySelector('#k-voice').classList.remove('live','down');
+  captxt.textContent='收尾中…'; fytxt.textContent='收尾中…';
+  const dur=((performance.now()-vstart)/1000).toFixed(1);
+  setTimeout(()=>{
+    vstate='done'; stage.classList.remove('draining');
+    cap.classList.add('done'); captxt.textContent=`已交给 Typeless · ${dur} 秒`;
+    fycap.classList.remove('live'); fytxt.textContent=`已交给 Typeless · ${dur} 秒`;
+    tray.classList.remove('live');
+    const d=$('#dest'); d.classList.remove('got'); void d.offsetWidth; d.classList.add('got');
+    const n=$('#st-n'); n.textContent=(+n.textContent+1);
+    doneTimer=setTimeout(()=>{ vstate='idle'; cap.classList.remove('done'); captxt.textContent='按住遥控器上的语音键说话'; fytxt.textContent='按住语音键说话'; },2600);
+  },420);
+}
+
+// waveform (smoothed noise bars)
+const wave=$('#wave'), wctx=wave.getContext('2d'), fyw=$('#fywave'), fctx=fyw.getContext('2d');
+const hist=new Array(48).fill(0);
+function drawWave(){
+  if (vstate==='listening'){ targetLevel = .25 + Math.abs(Math.sin(performance.now()/180))*.45 + Math.random()*.3; }
+  else targetLevel = 0;
+  level += (targetLevel-level)*0.25;
+  hist.push(level); hist.shift();
+  const pm=$('#pmeter'); if(pm) pm.style.width=(level*100)+'%';
+  if (vstate==='listening'){ const s=Math.floor((performance.now()-vstart)/1000); timeEl.textContent=`${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`; }
+  paint(wctx, wave, hist, 3);
+  paint(fctx, fyw, hist.slice(-36), 3);
+  document.querySelectorAll('#traybars i').forEach((b,i)=>b.style.height=(3+hist[hist.length-1-i*3]*11)+'px');
+}
+function paint(ctx, cv, data, bw){
+  ctx.clearRect(0,0,cv.width,cv.height);
+  const g=ctx.createLinearGradient(0,0,cv.width,0); g.addColorStop(0,'#ff6b6b'); g.addColorStop(.55,'#a46bff'); g.addColorStop(1,'#29d3ff');
+  ctx.fillStyle=g;
+  const gap=cv.width/data.length;
+  data.forEach((v,i)=>{ const h=Math.max(3, v*cv.height*.95); const x=i*gap+(gap-bw*2)/2; roundRect(ctx,x,(cv.height-h)/2,bw*2,h,bw); });
+}
+function roundRect(ctx,x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.fill(); }
+
+// ---------------- key press demo ----------------
+let currentKey='ok', currentG='single';
+function pressKey(k){
+  if (k==='voice') return;
+  const els=remote.querySelectorAll(`[data-k="${k}"]`);
+  els.forEach(e=>{ e.classList.add('down'); setTimeout(()=>e.classList.remove('down'),170); });
+  if (page==='keys'){ selectKey(k); const L=LABELS.find(l=>l.k===k || (l.group||[]).includes(k)); if(L){ L.el.classList.remove('flash'); void L.el.offsetWidth; L.el.classList.add('flash'); } return; }
+  const kb=keyBox(k); if(!kb) return;
+  const c=document.createElement('div'); c.className='callout glass';
+  const a=KEYS[k].a.single;
+  c.innerHTML=`<small>${KEYS[k].name}</small>${/^[↑↓←→]$|^Return$|^Esc$|^⌘|^⌥|^⌃/.test(a)?`<kbd>${a}</kbd>`:a}`;
+  c.style.left=(kb.x+kb.w/2+16)+'px'; c.style.top=(kb.y-16)+'px';
+  stage.appendChild(c); setTimeout(()=>c.remove(),1400);
+}
+function selectKey(k){
+  currentKey=k;
+  remote.querySelectorAll('.sel').forEach(n=>n.classList.remove('sel'));
+  const L=LABELS.find(l=>l.k===k || (l.group||[]).includes(k));
+  LABELS.forEach(x=>{ x.el.classList.toggle('sel', x===L); x.path.classList.toggle('hot', x===L); });
+  if (page!=='keys') return;
+  remote.querySelectorAll(`[data-k="${k}"]`).forEach(n=>n.classList.add('sel'));
+  $('#ke-name').textContent=KEYS[k].name;
+  $('#ke-desc').innerHTML=(KEYS[k].c||'单击、双击、长按各配一个动作。')+' <span class="tag">M2</span>';
+  showAction();
+}
+function showAction(){
+  const v=$('#ke-v'); v.classList.add('swap');
+  setTimeout(()=>{ v.textContent=KEYS[currentKey].a[currentG]; v.classList.remove('swap'); },140);
+  $('#ke-c').textContent = KEYS[currentKey].fixed ? '固定，不能更改' : {single:'单击时',double:'快速按两下时',long:'按住超过 0.5 秒时'}[currentG];
+}
+document.querySelectorAll('#gseg button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#gseg button').forEach(x=>x.classList.toggle('on',x===b));
+  moveInd($('#gseg'), b); currentG=b.dataset.g; showAction();
+});
+
+// pointer on remote
+remote.addEventListener('pointerdown', e=>{
+  const t=e.target.closest('[data-k]'); if(!t) return;
+  const k=t.dataset.k;
+  if (k==='voice'){ voiceDown(); const up=()=>{voiceUp(); window.removeEventListener('pointerup',up);}; window.addEventListener('pointerup',up); return; }
+  pressKey(k);
+});
+
+// keyboard → remote
+const KB={ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right',Enter:'ok',Escape:'back',Backspace:'back',h:'home',H:'home',m:'menu',M:'menu','+':'volup','=':'volup','-':'voldown',t:'tv',T:'tv',p:'power',P:'power'};
+window.addEventListener('keydown', e=>{
+  if (e.code==='Space'){ e.preventDefault(); if(!e.repeat) voiceDown(); return; }
+  const k=KB[e.key]; if(k){ e.preventDefault(); pressKey(k); }
+});
+window.addEventListener('keyup', e=>{ if(e.code==='Space'){ e.preventDefault(); voiceUp(); } });
+
+// ---------------- window ↔ menu bar ----------------
+const flyout=$('#flyout');
+function placeFlyout(){ const t=tray.getBoundingClientRect(); flyout.style.left=Math.max(12, t.right-330+8)+'px'; }
+function closeWin(){
+  const t=tray.getBoundingClientRect(), w=win.getBoundingClientRect();
+  const dx=(t.left+t.width/2)-(w.left+w.width/2), dy=(t.top+t.height/2)-(w.top+w.height/2);
+  win.style.transform=`translate(-50%,-50%) translate(${dx}px,${dy}px) scale(.04)`;
+  win.classList.add('closed');
+  setTimeout(()=>{ placeFlyout(); flyout.classList.add('on'); tray.classList.add('open'); },380);
+}
+function openWin(){
+  flyout.classList.remove('on'); tray.classList.remove('open');
+  win.classList.remove('closed'); win.style.transform='translate(-50%,-50%)';
+}
+$('#closeBtn').onclick=closeWin;
+$('#openWin').onclick=openWin;
+tray.onclick=()=>{ if(!win.classList.contains('closed')){ placeFlyout(); } const on=!flyout.classList.contains('on'); placeFlyout(); flyout.classList.toggle('on',on); tray.classList.toggle('open',on); };
+document.querySelectorAll('.sw').forEach(s=>s.onclick=()=>s.classList.toggle('on'));
+$('#themeBtn').onclick=()=>document.body.classList.toggle('light');
+if (matchMedia('(prefers-color-scheme: light)').matches) document.body.classList.add('light');
+const d=new Date(); $('#clock').textContent=['周日','周一','周二','周三','周四','周五','周六'][d.getDay()]+' '+d.toTimeString().slice(0,5);
+
+window.addEventListener('resize', layout);
+setPage('overview');
+requestAnimationFrame(()=>{ moveInd($('#nav'), $('#nav button.on')); moveInd($('#gseg'), $('#gseg button.on')); });
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

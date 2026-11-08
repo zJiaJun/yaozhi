@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>遥指 Yaozhi · A1 墨指的配色</title>
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!--
+  A1"墨指"定了形状（左下的指尖收细指向右上，前方一个目标圆点），这里只比配色：图形渐变、
+  底板换色、白底加点睛色。每个配色都有浅色和深色两个版本（macOS 26 在深色模式下换用深色图标）。
+  菜单栏图标是系统着色的单色模板图，不受配色影响。
+-->
+<style>
+:root{
+  --bg:#f4f3f0; --card:#fff; --ink:#16171b; --muted:#6c6c72; --line:rgba(0,0,0,.08); --accent:#5b8cff;
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","PingFang SC","Helvetica Neue",sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;font-size:14px}
+header{max-width:1200px;margin:0 auto;padding:40px 28px 6px}
+h1{margin:0 0 8px;font-size:30px;letter-spacing:-.4px}
+header p{margin:0;color:var(--muted);line-height:1.65;max-width:880px}
+.docks{max-width:1200px;margin:22px auto 0;padding:0 28px;display:grid;gap:12px}
+.dock{border-radius:22px;padding:16px;display:flex;justify-content:center}
+.dock.light{background:linear-gradient(135deg,#dfe6ff,#f6e6ee 60%,#f3ece2)}
+.dock.dark{background:linear-gradient(135deg,#25304f,#3b2f45 60%,#4a3a3d)}
+.shelf{display:flex;gap:10px;padding:8px 12px;border-radius:20px;background:rgba(255,255,255,.4);backdrop-filter:blur(10px);flex-wrap:wrap;justify-content:center}
+.dock.dark .shelf{background:rgba(255,255,255,.12)}
+.shelf .app{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:10.5px;color:#3c3c42}
+.dock.dark .shelf .app{color:#d8d8de}
+.shelf svg{width:60px;height:60px;filter:drop-shadow(0 6px 10px rgba(20,25,45,.25))}
+main{max-width:1200px;margin:0 auto;padding:22px 28px 60px;display:grid;grid-template-columns:repeat(2,1fr);gap:18px}
+.v{background:var(--card);border-radius:22px;border:1px solid var(--line);box-shadow:0 14px 40px rgba(40,45,70,.07);overflow:hidden;display:flex;flex-direction:column}
+.v.rec{outline:2.5px solid var(--accent);outline-offset:-2.5px}
+.v .art{display:grid;grid-template-columns:1fr 1fr;}
+.v .art div{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:22px 10px}
+.v .art .l{background:radial-gradient(70% 70% at 50% 40%,#fff,#ecebe7)}
+.v .art .d{background:radial-gradient(70% 70% at 50% 40%,#3a3b42,#1c1d22)}
+.v .art svg.big{width:150px;height:150px;filter:drop-shadow(0 16px 22px rgba(20,25,45,.28))}
+.v .art .s{display:flex;flex-direction:row;gap:10px;align-items:flex-end;padding:0}
+.v .art .s span{display:block}
+.v .art .s svg{display:block}
+.v .info{padding:16px 20px 18px;display:flex;flex-direction:column;gap:8px}
+.v .info .t{display:flex;align-items:baseline;gap:10px}
+.v .info h2{margin:0;font-size:18px}
+.v .info .tag{font-size:11px;font-weight:700;color:#fff;background:var(--accent);padding:2px 8px;border-radius:999px}
+.v .info p{margin:0;color:#3c3c42;line-height:1.6;font-size:13px}
+.v .info .sw{display:flex;gap:6px;margin-top:2px}
+.v .info .sw i{width:22px;height:22px;border-radius:7px;display:block;border:1px solid var(--line)}
+footer{max-width:1200px;margin:0 auto;padding:0 28px 50px;color:var(--muted);line-height:1.7;font-size:13px}
+@media (max-width:900px){main{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header>
+  <h1>A1 墨指：有颜色的方案</h1>
+  <p>形状不变：左下的"指尖"一路收细指向右上，前方隔一点空隙是被指中的目标圆点。下面只换颜色，分三类：<b>图形渐变</b>（白底，图形上色）、<b>底板换色</b>（彩色或深色底，白色图形）、<b>点睛</b>（基本黑白，只给目标圆点一点颜色）。每个都有浅色和深色版本，先在下面两排 Dock 里横向比一比。</p>
+</header>
+<section class="docks">
+  <div class="dock light"><div class="shelf" id="dockLight"></div></div>
+  <div class="dock dark"><div class="shelf" id="dockDark"></div></div>
+</section>
+<main id="main"></main>
+<footer>
+  说明：菜单栏图标是单色模板图，由系统按菜单栏颜色着色，所有配色共用同一个菜单栏图形；"需要处理"等状态的小圆点可以用配色里的强调色。定稿后 App 图标用 Icon Composer 做成分层的 .icon：底板、指尖、目标圆点各占一层，macOS 26 的浅色、深色、着色和透明模式都由它自动处理。
+</footer>
+
+<script>
+const SQ = 'M285,100 H739 C866,100 924,158 924,285 V739 C924,866 866,924 739,924 H285 C158,924 100,866 100,739 V285 C100,158 158,100 285,100 Z';
+let uid = 0;
+function teardrop(cx, cy, r, tx, ty, tr) {
+  const dx = tx - cx, dy = ty - cy, d = Math.hypot(dx, dy);
+  const a = Math.atan2(dy, dx), b = Math.acos((r - tr) / d);
+  const p = (x, y, rr, t) => [x + rr * Math.cos(t), y + rr * Math.sin(t)];
+  const [h1x, h1y] = p(cx, cy, r, a + b), [t1x, t1y] = p(tx, ty, tr, a + b);
+  const [t2x, t2y] = p(tx, ty, tr, a - b), [h2x, h2y] = p(cx, cy, r, a - b);
+  const f = v => v.toFixed(2);
+  return `M${f(h1x)},${f(h1y)} L${f(t1x)},${f(t1y)} A${tr},${tr} 0 0 0 ${f(t2x)},${f(t2y)} L${f(h2x)},${f(h2y)} A${r},${r} 0 1 0 ${f(h1x)},${f(h1y)} Z`;
+}
+const DROP = teardrop(362, 662, 132, 654, 370, 26);
+const DOT = [728, 296, 58];
+
+// One variant = a plate (two stops, top to bottom) and paints for the drop
+// and the dot (a color, or a two-stop gradient from lower left to upper
+// right), for light and for dark.
+function icon(spec) {
+  const g = 'g' + (++uid);
+  const grad = (id, c, dir) => Array.isArray(c)
+    ? `<linearGradient id="${g}${id}" ${dir}>${c.map((s, i) => `<stop offset="${i / (c.length - 1)}" stop-color="${s}"/>`).join('')}</linearGradient>`
+    : '';
+  const paint = (id, c) => Array.isArray(c) ? `url(#${g}${id})` : c;
+  const diag = 'x1="0" y1="1" x2="1" y2="0"', vert = 'x1="0" y1="0" x2="0" y2="1"';
+  const sheen = spec.sheen ?? .5;
+  return `<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg"><defs>
+    ${grad('p', spec.plate, spec.plateDiag ? diag : vert)}
+    ${grad('k', spec.drop, diag)}${grad('o', spec.dot, diag)}
+    <linearGradient id="${g}h" ${vert}><stop offset="0" stop-color="#fff" stop-opacity="${sheen}"/><stop offset=".45" stop-color="#fff" stop-opacity="0"/></linearGradient>
+    <radialGradient id="${g}r" cx=".3" cy=".25" r=".6"><stop offset="0" stop-color="#fff" stop-opacity="${spec.gloss ?? 0}"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+    ${spec.glow ? `<filter id="${g}f" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="30"/></filter>` : ''}
+  </defs>
+    <path d="${SQ}" fill="${paint('p', spec.plate)}"/>
+    <path d="${SQ}" fill="url(#${g}h)"/>
+    <path d="${SQ}" fill="none" stroke="${spec.edge || '#000'}" stroke-opacity=".07" stroke-width="4"/>
+    ${spec.glow ? `<circle cx="${DOT[0]}" cy="${DOT[1]}" r="${DOT[2] + 30}" fill="${spec.glow}" opacity=".7" filter="url(#${g}f)"/>` : ''}
+    <path d="${DROP}" fill="${paint('k', spec.drop)}"/>
+    ${spec.gloss ? `<path d="${DROP}" fill="url(#${g}r)"/>` : ''}
+    <circle cx="${DOT[0]}" cy="${DOT[1]}" r="${DOT[2]}" fill="${paint('o', spec.dot)}"/>
+  </svg>`;
+}
+
+const V = [
+  // --- 图形渐变：白底，图形上色 ---
+  { name: '蓝紫渐变', kind: '图形渐变', rec: true,
+    note: '主窗口的蓝紫极光直接搬到图形上：指尖从天蓝渐变到紫，目标圆点是紫色。白底干净，又比黑色有生气，和 App 里的配色一脉相承。',
+    swatch: ['#ffffff', '#4f9dff', '#8b5cf6'],
+    light: { plate: ['#ffffff', '#eceef5'], drop: ['#4f9dff', '#8b5cf6'], dot: ['#9a6bff', '#7c4dff'], gloss: .35 },
+    dark: { plate: ['#2a2b33', '#101116'], drop: ['#5aa8ff', '#9b6bff'], dot: ['#a77bff', '#8a5cff'], sheen: .12, edge: '#fff', gloss: .25 } },
+  { name: '暮色', kind: '图形渐变',
+    note: '珊瑚到洋红的暖色渐变，呼应语音键的红色光点。暖色在一排蓝色系图标里很显眼。',
+    swatch: ['#ffffff', '#ff8a5c', '#e2367a'],
+    light: { plate: ['#ffffff', '#f3eeec'], drop: ['#ff9a5c', '#e2367a'], dot: ['#ec4c86', '#c82a6c'], gloss: .35 },
+    dark: { plate: ['#2c2a2d', '#121014'], drop: ['#ffa36a', '#ef4a8a'], dot: ['#f45e95', '#d93a79'], sheen: .12, edge: '#fff', gloss: .25 } },
+  { name: '青碧', kind: '图形渐变',
+    note: '青绿到蓝的冷色渐变，清爽、偏工具感，和系统的辅助功能、终端一类工具图标放在一起很协调。',
+    swatch: ['#ffffff', '#2ed3b7', '#2f7cf6'],
+    light: { plate: ['#ffffff', '#ebf1f1'], drop: ['#2fd9b9', '#2f7cf6'], dot: ['#3a86ff', '#2563eb'], gloss: .35 },
+    dark: { plate: ['#232a2c', '#0e1314'], drop: ['#3be2c3', '#4b8dff'], dot: ['#5a97ff', '#3b74f0'], sheen: .12, edge: '#fff', gloss: .25 } },
+
+  // --- 底板换色：彩色或深色底，白色图形 ---
+  { name: '靛蓝底', kind: '底板换色',
+    note: '深靛蓝到紫的底板，白色图形，目标圆点用珊瑚色点亮，像夜里被遥控器"指中"的那一下。浅深两种模式下都一样醒目。',
+    swatch: ['#3346c9', '#6b3fd4', '#ff6b6b'],
+    light: { plate: ['#4258e6', '#6a3fd6'], plateDiag: true, drop: '#ffffff', dot: ['#ff8a7a', '#ff5a6a'], glow: '#ff6b6b', sheen: .3, edge: '#000' },
+    dark: { plate: ['#26307a', '#3b2385'], plateDiag: true, drop: '#f2f3ff', dot: ['#ff8a7a', '#ff5a6a'], glow: '#ff6b6b', sheen: .14, edge: '#fff' } },
+  { name: '珊瑚底', kind: '底板换色',
+    note: '暖珊瑚到橙的底板，白色图形，活泼、友好，最"消费级"的一个，Dock 里一眼就能找到。',
+    swatch: ['#ff7a6b', '#ff9f43', '#ffffff'],
+    light: { plate: ['#ff8a6b', '#ff5f7a'], plateDiag: true, drop: '#ffffff', dot: '#ffffff', sheen: .3 },
+    dark: { plate: ['#c2485a', '#8f2f55'], plateDiag: true, drop: '#fff4f0', dot: '#fff4f0', sheen: .14, edge: '#fff' } },
+  { name: '曜黑底', kind: '底板换色',
+    note: '近黑的石墨底板，白色指尖，目标圆点用蓝紫渐变发光。专业、冷静，像 Raycast、终端这类工具。浅色模式下也保持深色底。',
+    swatch: ['#1b1c22', '#ffffff', '#7b6bff'],
+    light: { plate: ['#2a2b33', '#111217'], drop: '#ffffff', dot: ['#5aa8ff', '#9b6bff'], glow: '#7b6bff', sheen: .16, edge: '#000' },
+    dark: { plate: ['#22232a', '#0b0c10'], drop: '#f4f4f8', dot: ['#5aa8ff', '#9b6bff'], glow: '#7b6bff', sheen: .1, edge: '#fff' } },
+
+  // --- 点睛：基本黑白，只点亮目标 ---
+  { name: '点睛', kind: '点睛',
+    note: '保留 A1 的黑白，只把目标圆点换成珊瑚红并带一点光晕：几乎和 Typeless 一样克制，但多了一个"被指中"的视觉焦点。',
+    swatch: ['#ffffff', '#111114', '#ff5a5f'],
+    light: { plate: ['#ffffff', '#eceef3'], drop: '#121216', dot: ['#ff8a7a', '#ff4d5e'], glow: '#ff6b6b' },
+    dark: { plate: ['#2a2b31', '#0f1013'], drop: '#f4f4f6', dot: ['#ff8a7a', '#ff4d5e'], glow: '#ff6b6b', sheen: .12, edge: '#fff' } },
+  { name: '纸墨', kind: '点睛',
+    note: '暖白的纸色底板，深墨蓝的指尖，赭红的目标圆点。有一点东方水墨和印章的味道，安静、有质感。',
+    swatch: ['#f7f2e8', '#1f2a44', '#c8553d'],
+    light: { plate: ['#fbf7ef', '#efe7d8'], drop: '#1f2a44', dot: '#c8553d', sheen: .6 },
+    dark: { plate: ['#2c2a26', '#14130f'], drop: '#efe7d8', dot: '#e06a4f', sheen: .1, edge: '#fff' } },
+];
+
+const icons = V.map(v => ({ ...v, L: icon(v.light), D: icon(v.dark) }));
+document.getElementById('dockLight').innerHTML = icons.map(v => `<div class="app">${v.L}<span>${v.name}</span></div>`).join('');
+document.getElementById('dockDark').innerHTML = icons.map(v => `<div class="app">${v.D}<span>${v.name}</span></div>`).join('');
+
+const main = document.getElementById('main');
+let lastKind = '';
+for (const v of icons) {
+  const el = document.createElement('section');
+  el.className = 'v' + (v.rec ? ' rec' : '');
+  const small = svg => [32, 16].map(n => `<span style="width:${n}px;height:${n}px">${svg.replace('<svg ', `<svg width="${n}" height="${n}" `)}</span>`).join('');
+  el.innerHTML = `
+    <div class="art">
+      <div class="l">${v.L.replace('<svg ', '<svg class="big" ')}<div class="s">${small(v.L)}</div></div>
+      <div class="d">${v.D.replace('<svg ', '<svg class="big" ')}<div class="s">${small(v.D)}</div></div>
+    </div>
+    <div class="info">
+      <div class="t"><h2>${v.name}</h2>${v.rec ? '<span class="tag">推荐</span>' : ''}<span style="font-size:12px;color:var(--muted)">${v.kind}</span></div>
+      <p>${v.note}</p>
+      <div class="sw">${v.swatch.map(c => `<i style="background:${c}"></i>`).join('')}</div>
+    </div>`;
+  main.appendChild(el);
+}
+</script>
+</body>
+</html>

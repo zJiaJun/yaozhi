@@ -1,0 +1,16 @@
+{
+  "name": "Yaozhi",
+  "slug": "yaozhi",
+  "identifier": "com.github.zjiajun.yaozhi",
+  "version": "0.0.1",
+  "copyright": "© 2026 zhujiajun",
+  "license": "GPL-3.0-only",
+  "main": "./cmd/yaozhi",
+  "out": "build",
+  "macos": {
+    "minimumSystemVersion": "13.0",
+    "infoPlist": {
+      "NSBluetoothAlwaysUsageDescription": "遥指需要蓝牙来连接遥控器并接收语音。"
+    }
+  }
+}

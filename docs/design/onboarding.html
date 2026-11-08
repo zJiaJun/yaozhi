@@ -1,0 +1,512 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>遥指 Yaozhi · 首次设置向导</title>
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!--
+  首次设置向导，沿用版本一定稿的视觉（舞台、玻璃、状态岛、跟随系统外观）。
+  步骤：欢迎 → 连接遥控器（蓝牙）→ 虚拟麦克风（BlackHole、yaozhi-mic）→ 允许模拟按键（辅助功能）
+       → 设置 Typeless → 试一试 → 完成。
+  权限的完整引导（系统设置 + MyGo 拖拽面板）见 permissions.html，这里只示意等待和完成。
+  系统自己的弹窗画成虚线示意框。
+-->
+<style>
+:root{
+  --ease:cubic-bezier(.16,1,.3,1); --spring:cubic-bezier(.34,1.32,.64,1);
+  --accent:#5b8cff; --accent2:#a46bff; --accent3:#29d3ff;
+  --voice:#ff6b6b; --ok:#3ddc84; --warn:#ffb340; --bad:#ff5d5d;
+  --text:#f5f6f8; --muted:rgba(245,246,248,.62); --faint:rgba(245,246,248,.38);
+  --glass:rgba(255,255,255,.075); --glass-hi:rgba(255,255,255,.14); --glass-line:rgba(255,255,255,.14);
+  --stage:#07080c; --aur1:rgba(76,96,255,.42); --aur2:rgba(150,80,255,.32); --aur3:rgba(0,190,255,.22);
+  --shadow:rgba(0,0,0,.65);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","PingFang SC","Helvetica Neue",sans-serif;
+}
+body.light{
+  --text:#16171b; --muted:rgba(22,23,27,.6); --faint:rgba(22,23,27,.36);
+  --glass:rgba(255,255,255,.62); --glass-hi:rgba(255,255,255,.85); --glass-line:rgba(255,255,255,.9);
+  --stage:#f6f5f2; --aur1:rgba(120,150,255,.28); --aur2:rgba(190,140,255,.22); --aur3:rgba(110,220,255,.22);
+  --shadow:rgba(40,45,70,.35); --ok:#1fa75a; --warn:#e08a00; --bad:#e23b3b;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;height:100%;overflow:hidden}
+body{color:var(--text);-webkit-font-smoothing:antialiased;font-size:13px;user-select:none}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;padding:0}
+svg{display:block}
+
+.desktop{position:fixed;inset:0;background:
+  radial-gradient(1200px 700px at 15% 10%,#5a6fb0 0%,transparent 60%),
+  radial-gradient(900px 700px at 90% 90%,#a7748f 0%,transparent 60%),
+  linear-gradient(160deg,#2b3350,#3b2f45 55%,#4a3a3d)}
+body.light .desktop{background:
+  radial-gradient(1200px 700px at 15% 10%,#c9d6ff 0%,transparent 60%),
+  radial-gradient(900px 700px at 90% 90%,#ffd9e3 0%,transparent 60%),
+  linear-gradient(160deg,#e9edf8,#f4ecf3 55%,#f6efe8)}
+.menubar{position:absolute;top:0;left:0;right:0;height:28px;display:flex;align-items:center;gap:18px;padding:0 14px;
+  background:rgba(20,22,30,.18);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);color:#fff;z-index:50}
+body.light .menubar{color:#111;background:rgba(255,255,255,.25)}
+.menubar .right{margin-left:auto}
+
+.win{position:absolute;left:50%;top:calc(50% - 10px);width:min(1060px,calc(100vw - 80px));height:min(660px,calc(100vh - 150px));
+  transform:translate(-50%,-50%);border-radius:22px;overflow:hidden;background:var(--stage);
+  box-shadow:0 40px 120px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.08) inset,0 0 0 .5px rgba(0,0,0,.6)}
+body.light .win{box-shadow:0 40px 120px rgba(60,70,110,.35),0 0 0 1px rgba(255,255,255,.9) inset}
+body.light .win::before{content:"";position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(50% 65% at 28% 55%,#fff 0%,rgba(255,255,255,0) 70%),radial-gradient(45% 55% at 88% 12%,rgba(255,214,190,.38),transparent 70%)}
+.aurora{position:absolute;inset:-20%;background:
+  radial-gradient(40% 35% at 30% 30%,var(--aur1),transparent 70%),
+  radial-gradient(35% 40% at 75% 60%,var(--aur2),transparent 70%),
+  radial-gradient(30% 30% at 55% 85%,var(--aur3),transparent 70%);
+  filter:blur(30px);animation:drift 22s ease-in-out infinite alternate;opacity:.9}
+body.light .aurora{opacity:.32;filter:blur(46px) saturate(.7)}
+@keyframes drift{0%{transform:translate(0,0) rotate(0)}50%{transform:translate(3%,-2%) rotate(6deg)}100%{transform:translate(-2%,3%) rotate(-4deg)}}
+.glass{background:var(--glass);backdrop-filter:blur(26px) saturate(170%);-webkit-backdrop-filter:blur(26px) saturate(170%);
+  border:1px solid var(--glass-line);box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 12px 34px rgba(0,0,0,.28)}
+body.light .glass{box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 12px 34px rgba(70,80,120,.14)}
+.lights{position:absolute;left:18px;top:18px;display:flex;gap:8px;z-index:10}
+.lights i{width:12px;height:12px;border-radius:50%;background:#ff5f57;display:block}
+.lights i:nth-child(2){background:#febc2e}.lights i:nth-child(3){background:#28c840}
+
+/* steps rail */
+.rail{position:absolute;left:50%;top:12px;transform:translateX(-50%);z-index:10;display:flex;align-items:center;gap:4px;padding:5px 8px;border-radius:999px}
+.rail span{display:flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;color:var(--faint);font-weight:500;transition:color .3s,background .4s}
+.rail span i{width:16px;height:16px;border-radius:50%;display:grid;place-items:center;font-size:10px;font-style:normal;font-weight:700;background:var(--glass-hi);color:var(--muted);transition:background .3s,color .3s}
+.rail span.done{color:var(--muted)} .rail span.done i{background:var(--ok);color:#fff}
+.rail span.cur{color:var(--text);background:var(--glass-hi)} .rail span.cur i{background:var(--accent);color:#fff}
+
+/* remote */
+.hero{position:absolute;left:27%;top:52%;width:var(--hw,150px);transform:translate(-50%,-50%) scale(var(--hs,1));transition:transform 1s var(--spring);z-index:3}
+.float{animation:float 7s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(-5px)}50%{transform:translateY(6px)}}
+.floor{position:absolute;left:50%;bottom:-30px;width:70%;height:34px;transform:translateX(-50%);border-radius:50%;background:radial-gradient(closest-side,var(--shadow),transparent);filter:blur(6px)}
+body.light .floor{opacity:.45}
+.hero svg{width:100%;overflow:visible}
+body.light .hero svg{-webkit-box-reflect:below 4px linear-gradient(transparent 85%,rgba(255,255,255,.28))}
+.k,.kw{pointer-events:none}.kw{fill:transparent}
+#k-voice{transition:filter .3s}
+.win.try #k-voice{pointer-events:auto;cursor:pointer}
+.win.listening #k-voice{fill:url(#k-voiceg);stroke:#b3262b;filter:drop-shadow(0 0 10px rgba(255,107,107,.9))}
+.rings circle{fill:none;stroke:var(--voice);stroke-width:1.4;transform-box:fill-box;transform-origin:center;opacity:0}
+.win.listening .rings circle,.win.try .rings circle{animation:ring 1.8s cubic-bezier(.2,.7,.3,1) infinite}
+.win.try .rings circle{animation-duration:2.6s}
+.rings circle:nth-child(2){animation-delay:.6s}.rings circle:nth-child(3){animation-delay:1.2s}
+@keyframes ring{0%{transform:scale(1);opacity:.75}100%{transform:scale(4.2);opacity:0}}
+.ready-dot{fill:var(--faint);opacity:.9;transition:fill .4s}
+.win.linked .ready-dot{fill:var(--ok);animation:breathe 3.2s ease-in-out infinite}
+@keyframes breathe{0%,100%{opacity:.25}50%{opacity:.95}}
+/* searching: a halo around the remote */
+.halo{position:absolute;left:50%;top:50%;width:260%;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;pointer-events:none;opacity:0;
+  background:radial-gradient(closest-side,rgba(91,140,255,.0) 55%,rgba(91,140,255,.22) 70%,rgba(91,140,255,0) 72%);transition:opacity .5s}
+.win.searching .halo{opacity:1;animation:halo 2.2s ease-out infinite}
+@keyframes halo{0%{transform:translate(-50%,-50%) scale(.6);opacity:.9}100%{transform:translate(-50%,-50%) scale(1.25);opacity:0}}
+
+/* step content */
+.content{position:absolute;left:48%;right:56px;top:84px;bottom:100px;z-index:5}
+.step{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;gap:14px;pointer-events:none}
+.step > *{opacity:0;transform:translateY(12px)}
+.step.on{pointer-events:auto}
+.step.on > *{animation:enter .7s var(--ease) both;animation-delay:calc(var(--i,0) * 75ms + 120ms)}
+.step.off > *{animation:leave .3s var(--ease) both}
+@keyframes enter{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes leave{from{opacity:1;transform:none}to{opacity:0;transform:translateY(-8px)}}
+.kicker{font-size:12px;font-weight:600;color:var(--accent3);letter-spacing:.6px}
+body.light .kicker{color:#3a5bd9}
+.step h1{margin:0;font-size:36px;line-height:1.12;font-weight:700;letter-spacing:-.6px}
+.step p.lead{margin:0;color:var(--muted);font-size:14.5px;line-height:1.6;max-width:460px}
+.card{border-radius:16px;padding:6px}
+.item{display:grid;grid-template-columns:32px 1fr auto;align-items:center;gap:12px;padding:10px;border-radius:12px}
+.item + .item{border-top:1px solid var(--glass-line);border-radius:0}
+.item > div:nth-child(2){min-width:0}
+.item .ic{width:32px;height:32px;border-radius:9px;display:grid;place-items:center;background:var(--glass-hi)}
+.item .ic svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.item b{display:block;font-weight:600}
+.item small{display:block;color:var(--muted);font-size:12px;margin-top:2px;line-height:1.4}
+.st{font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.st.ok{color:var(--ok)} .st.warn{color:var(--warn)} .st.wait{color:var(--accent)}
+.st svg{width:16px;height:16px}
+.st.ok svg path{stroke-dasharray:24;stroke-dashoffset:24;animation:draw .5s var(--ease) forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+.spin{width:14px;height:14px;border-radius:50%;border:2px solid rgba(91,140,255,.25);border-top-color:var(--accent);animation:spin .8s linear infinite;flex:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+.cmd{font-family:"SF Mono",Menlo,monospace;font-size:12px;padding:8px 10px;border-radius:9px;background:rgba(0,0,0,.25);display:flex;align-items:center;gap:10px}
+body.light .cmd{background:rgba(0,0,0,.06)}
+.cmd button{margin-left:auto;font-family:inherit;color:var(--accent3)}
+body.light .cmd button{color:#3a5bd9}
+.btns{display:flex;gap:10px;align-items:center;margin-top:6px}
+.btn{padding:10px 18px;border-radius:11px;font-weight:600;transition:transform .2s var(--spring),opacity .3s}
+.btn:active{transform:scale(.96)}
+.btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;box-shadow:0 8px 22px rgba(91,140,255,.35)}
+.btn.ghost{background:var(--glass-hi)}
+.btn[disabled]{opacity:.45;pointer-events:none}
+.link{color:var(--muted);text-decoration:underline;text-underline-offset:3px;font-size:12.5px}
+.note{font-size:12px;color:var(--faint);line-height:1.5}
+/* schematic of an input method's microphone menu (not Typeless' real UI) */
+.menu-mock{border-radius:12px;padding:6px;width:260px;font-size:12.5px}
+.menu-mock div{padding:7px 10px;border-radius:7px;display:flex;justify-content:space-between}
+.menu-mock .sel{background:var(--accent);color:#fff}
+.menu-mock .h{color:var(--faint);font-size:11px;padding:4px 10px}
+.big-ok{width:64px;height:64px;border-radius:50%;display:grid;place-items:center;background:rgba(61,220,132,.16);color:var(--ok)}
+.big-ok svg{width:34px;height:34px}
+.big-ok path{stroke-dasharray:24;stroke-dashoffset:24}
+.step.on .big-ok path{animation:draw .6s .4s var(--ease) forwards}
+
+/* try step: the wizard's own text box, focused, where Typeless writes */
+.tryfield{border-radius:16px;padding:12px 14px 10px;max-width:480px;transition:box-shadow .3s,border-color .3s}
+.tryfield.focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(91,140,255,.25),0 12px 34px rgba(0,0,0,.2)}
+.tryfield.got{border-color:var(--ok);box-shadow:0 0 0 3px rgba(61,220,132,.22),0 12px 34px rgba(0,0,0,.2)}
+.tryfield textarea{width:100%;border:0;outline:0;resize:none;background:transparent;color:var(--text);font:inherit;font-size:16px;line-height:1.55;caret-color:var(--accent)}
+.tryfield textarea::placeholder{color:var(--faint)}
+.tf-foot{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:12px;margin-top:6px}
+.tf-foot span{display:flex;align-items:center;gap:6px}
+.tf-dot{width:7px;height:7px;border-radius:50%;background:var(--faint)}
+.tryfield.listening .tf-dot{background:var(--voice);animation:breathe 1s ease-in-out infinite}
+.tryfield.got .tf-foot #y-state{color:var(--ok)}
+.step .card[hidden]{display:none}
+#y-help:not([hidden]){animation:enter .6s var(--ease) both}
+
+/* placeholder for the system's own prompt */
+.ph{position:absolute;left:50%;top:38%;transform:translate(-50%,-50%) scale(.96);border:1.5px dashed rgba(255,255,255,.55);border-radius:14px;
+  background:rgba(20,22,30,.6);color:#fff;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);padding:14px 16px;z-index:45;width:300px;
+  font-size:12.5px;line-height:1.5;opacity:0;pointer-events:none;transition:opacity .25s,transform .35s var(--spring)}
+body.light .ph{border-color:rgba(0,0,0,.35);background:rgba(255,255,255,.8);color:#111}
+.ph.open{opacity:1;transform:translate(-50%,-50%);pointer-events:auto}
+.ph em{display:block;font-style:normal;font-size:10.5px;letter-spacing:.6px;opacity:.6;margin-bottom:6px}
+.ph .bs{display:flex;gap:8px;margin-top:12px;justify-content:flex-end}
+.ph .bs button{padding:6px 12px;border-radius:8px;border:1px dashed currentColor;opacity:.85}
+
+/* status island (same as the main window) */
+.island{position:absolute;left:50%;bottom:26px;z-index:6;height:48px;width:240px;border-radius:999px;transform:translateX(-50%);overflow:hidden;
+  transition:width .55s var(--spring),height .55s var(--spring)}
+.island[data-s="listen"]{height:62px}
+.island .v{position:absolute;left:50%;top:0;bottom:0;width:max-content;display:flex;align-items:center;gap:10px;padding:0 20px;white-space:nowrap;
+  opacity:0;filter:blur(6px);transform:translateX(-50%) scale(.92);transition:opacity .22s,filter .3s,transform .45s var(--spring)}
+.island .v.on{opacity:1;filter:none;transform:translateX(-50%);transition-delay:.1s}
+.island .m{color:var(--muted)}
+.island .mic{position:relative;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;background:var(--voice);color:#fff;flex:none}
+.island .mic svg{width:15px;height:15px;position:relative}
+.island .mic i{position:absolute;inset:0;border-radius:50%;border:1.5px solid var(--voice);animation:ripple 1.6s cubic-bezier(.2,.7,.3,1) infinite}
+.island .mic i:nth-child(2){animation-delay:.53s}.island .mic i:nth-child(3){animation-delay:1.06s}
+@keyframes ripple{0%{transform:scale(.8);opacity:.9}100%{transform:scale(1.7);opacity:0}}
+.island .bars{display:flex;gap:3px;align-items:center;height:26px}
+.island .bars i{width:3px;border-radius:2px;background:linear-gradient(var(--voice),var(--accent2));animation:wv .9s ease-in-out infinite}
+@keyframes wv{0%,100%{height:5px}50%{height:24px}}
+.island .ck{width:20px;height:20px;color:var(--ok)}
+.island .ck path{stroke-dasharray:24;stroke-dashoffset:24}
+.island .v.on .ck path{animation:draw .5s .15s var(--ease) forwards}
+.pdot{width:9px;height:9px;border-radius:50%;background:var(--faint);flex:none}
+.pdot.ok{background:var(--ok)}.pdot.warn{background:var(--warn)}
+
+.legend{position:absolute;left:50%;transform:translateX(-50%);bottom:12px;z-index:90;padding:9px 14px;border-radius:14px;font-size:12px;
+  width:max-content;max-width:calc(100vw - 30px);display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center}
+.legend .opt{display:inline-flex;gap:2px;padding:2px;border-radius:9px;background:var(--glass)}
+.legend .opt button{color:var(--muted);padding:2px 8px;border-radius:7px}
+.legend .opt button.on{background:var(--glass-hi);color:var(--text);font-weight:600}
+.legend a{color:var(--accent3)} body.light .legend a{color:#3a5bd9}
+.legend kbd{font-family:"SF Mono",Menlo,monospace;font-size:11px;padding:1px 5px;border-radius:4px;background:var(--glass-hi)}
+
+@media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}}
+body.rm *,body.rm *::before,body.rm *::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
+</style>
+</head>
+<body>
+<div class="desktop">
+  <div class="menubar"><b>遥指</b><span>文件</span><span>编辑</span><div class="right" id="clock">周六 21:30</div></div>
+
+  <div class="win" id="win">
+    <div class="aurora"></div>
+    <div class="lights"><i></i><i></i><i></i></div>
+    <div class="rail glass" id="rail"></div>
+    <div class="hero" id="hero"><div class="halo"></div><div class="float"><div id="remote"></div></div><div class="floor"></div></div>
+
+    <div class="content" id="content">
+
+      <section class="step" data-step="welcome">
+        <div class="kicker" style="--i:0">欢迎使用遥指</div>
+        <h1 style="--i:1">用遥控器<br>控制你的 Mac。</h1>
+        <p class="lead" style="--i:2">先把最常用的一件事打通：按住遥控器上的语音键说话，松开，文字就出现在你正在输入的地方。整个设置大约 3 分钟。</p>
+        <div class="card glass" style="--i:3">
+          <div class="item"><div class="ic"><svg viewBox="0 0 24 24"><path d="M7 7l10 10-5 5V2l5 5L7 17"/></svg></div><div><b>连接遥控器</b><small>小米蓝牙遥控器 2 Pro，需要先在系统蓝牙里配对</small></div><span></span></div>
+          <div class="item"><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 12h2M8 8v8M12 5v14M16 9v6M20 11v2"/></svg></div><div><b>准备虚拟声卡</b><small>需要原版 BlackHole 2ch，其余由遥指自动完成</small></div><span></span></div>
+          <div class="item"><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h7M18 14v7"/></svg></div><div><b>接上你的输入法</b><small>第一版支持 Typeless；遥指不识别、不保存语音</small></div><span></span></div>
+        </div>
+        <div class="btns" style="--i:4"><button class="btn primary" data-go="next">开始设置</button></div>
+      </section>
+
+      <section class="step" data-step="remote">
+        <div class="kicker" style="--i:0">连接遥控器</div>
+        <h1 style="--i:1">找到你的遥控器</h1>
+        <p class="lead" style="--i:2">遥指用蓝牙连接遥控器、接收语音。点"继续"后，macOS 会询问是否允许遥指使用蓝牙。</p>
+        <div class="card glass" style="--i:3">
+          <div class="item"><div class="ic"><svg viewBox="0 0 24 24"><path d="M7 7l10 10-5 5V2l5 5L7 17"/></svg></div><div><b>蓝牙权限</b><small id="r-bt-s">连接遥控器、接收语音</small></div><span class="st" id="r-bt">未允许</span></div>
+          <div class="item"><div class="ic"><svg viewBox="0 0 24 24"><rect x="8" y="2.5" width="8" height="19" rx="4"/><circle cx="12" cy="9" r="2.3"/></svg></div><div><b id="r-dev-t">遥控器</b><small id="r-dev-s">还没在系统蓝牙里配对？先去 系统设置 → 蓝牙，长按遥控器上的 主页键 + 菜单键 进入配对</small></div><span class="st" id="r-dev">—</span></div>
+        </div>
+        <div class="btns" style="--i:4"><button class="btn primary" id="r-go">继续</button><button class="link" data-go="back">返回</button></div>
+      </section>
+
+      <section class="step" data-step="mic">
+        <div class="kicker" style="--i:0">虚拟声卡</div>
+        <h1 style="--i:1">安装 BlackHole 2ch</h1>
+        <p class="lead" style="--i:2">遥指把遥控器的声音写进开源的虚拟声卡 BlackHole，输入法再从这里收音。它需要你自己装一次原版；装好之后的事遥指会自动处理，不改你的系统默认麦克风。</p>
+        <div class="card glass" style="--i:3">
+          <div class="item"><div class="ic"><svg viewBox="0 0 24 24"><path d="M4 12h2M8 8v8M12 5v14M16 9v6M20 11v2"/></svg></div><div><b>BlackHole 2ch</b><small id="m-bh-s">在终端运行下面的命令安装，装好后遥指会自动发现</small></div><span class="st" id="m-bh"></span></div>
+          <div class="item" id="m-cmd-row" style="grid-template-columns:1fr"><div class="cmd">brew install blackhole-2ch<button id="m-copy">复制</button></div></div>
+        </div>
+        <div class="btns" style="--i:4"><button class="btn primary" id="m-go" disabled>等待安装…</button><button class="link" data-go="back">返回</button></div>
+        <div class="note" style="--i:5">已经装过 BlackHole 的话，向导会直接跳过这一步。</div>
+      </section>
+
+      <section class="step" data-step="ax">
+        <div class="kicker" style="--i:0">允许模拟按键</div>
+        <h1 style="--i:1">让遥指替你点 Fn</h1>
+        <p class="lead" style="--i:2">Typeless 用 Fn 开始和结束听写。遥指要在你按住、松开语音键时替你点一下 Fn，这需要"辅助功能"权限。遥指只发 Fn，不读取你的其他按键。</p>
+        <div class="card glass" style="--i:3">
+          <div class="item"><div class="ic"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><circle cx="12" cy="7.3" r="1.3" fill="currentColor"/><path d="M7.5 10h9M12 10v4l-2.5 4.5M12 14l2.5 4.5"/></svg></div><div><b>辅助功能</b><small id="a-s">打开系统设置后，把 Yaozhi 拖进列表</small></div><span class="st warn" id="a-st">未允许</span></div>
+        </div>
+        <div class="btns" style="--i:4"><button class="btn primary" id="a-go">去授权</button><button class="link" data-go="back">返回</button></div>
+        <div class="note" style="--i:5">系统设置和拖拽面板的完整过程见 <a href="permissions.html" style="color:inherit">权限原型</a>，这里只示意等待和完成。</div>
+      </section>
+
+      <section class="step" data-step="typeless">
+        <div class="kicker" style="--i:0">设置 Typeless</div>
+        <h1 style="--i:1">在 Typeless 里选 yaozhi-mic</h1>
+        <p class="lead" style="--i:2">打开 Typeless 的设置，把麦克风选为 yaozhi-mic，快捷键保持 Fn。遥指看不到 Typeless 的设置，选好后点"我选好了"，下一步说一句话来确认。</p>
+        <div class="menu-mock glass" style="--i:3">
+          <div class="h">麦克风（示意）</div>
+          <div>MacBook Pro 麦克风</div>
+          <div class="sel">yaozhi-mic <span>✓</span></div>
+        </div>
+        <div class="btns" style="--i:4"><button class="btn primary" data-go="next">我选好了</button><button class="btn ghost" id="t-open">打开 Typeless</button><button class="link" data-go="back">返回</button></div>
+      </section>
+
+      <section class="step" data-step="try">
+        <div class="kicker" style="--i:0">试一试</div>
+        <h1 style="--i:1" id="y-h">按住语音键，说一句话</h1>
+        <p class="lead" style="--i:2" id="y-p">光标已经放在下面的输入框里。按住遥控器上闪着的语音键说话，松开后，Typeless 会把文字写进这里。</p>
+        <div class="tryfield glass" style="--i:3" id="y-field">
+          <textarea id="y-text" rows="3" placeholder="比如：今天下午三点开会，记得带电脑"></textarea>
+          <div class="tf-foot"><span id="y-state"><i class="tf-dot"></i>等你说话</span><span id="y-count"></span></div>
+        </div>
+        <div class="btns" style="--i:4"><button class="btn primary" id="y-done" hidden>完成设置</button><button class="link" id="y-retry" hidden>清空，再说一句</button><button class="link" id="y-skip">跳过，稍后再试</button></div>
+        <div class="card glass" id="y-help" hidden>
+          <div class="item"><div class="ic">1</div><div><b>Typeless 的麦克风选的是 yaozhi-mic 吗？</b><small>选成别的麦克风，Typeless 听不到遥控器的声音</small></div><span></span></div>
+          <div class="item"><div class="ic">2</div><div><b>Typeless 在运行，快捷键是 Fn 吗？</b><small>遥指替你点的是 Fn</small></div><span></span></div>
+          <div class="item"><div class="ic">3</div><div><b>还是不行？</b><small>到遥指的"语音"页播放测试音，看声音能不能到 yaozhi-mic</small></div><span></span></div>
+        </div>
+      </section>
+
+      <section class="step" data-step="done">
+        <div class="big-ok" style="--i:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
+        <h1 style="--i:1">一切就绪</h1>
+        <p class="lead" style="--i:2">以后随时按住语音键说话。关掉窗口后，遥指留在菜单栏里。</p>
+        <div class="btns" style="--i:3"><a class="btn primary" href="main-window.html" style="text-decoration:none">完成</a><button class="link" data-go="restart">从头再看一遍</button></div>
+      </section>
+    </div>
+
+    <div class="ph" id="ph"></div>
+
+    <div class="island glass" id="island" data-s="idle">
+      <div class="v" data-v="idle"><i class="pdot" id="idot"></i><span class="m" id="itxt">还没连接遥控器</span></div>
+      <div class="v" data-v="wait"><i class="spin"></i><span id="iwait">正在查找遥控器…</span></div>
+      <div class="v" data-v="listen"><span class="mic"><i></i><i></i><i></i><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></span><span class="bars"><i></i><i style="animation-delay:.12s"></i><i style="animation-delay:.24s"></i><i style="animation-delay:.36s"></i><i style="animation-delay:.48s"></i><i style="animation-delay:.6s"></i><i style="animation-delay:.72s"></i></span><span class="m">正在听</span></div>
+      <div class="v" data-v="ok"><svg class="ck" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span id="iok">已连接</span></div>
+    </div>
+  </div>
+
+  <div class="legend glass">
+    <span>点按钮往下走；"试一试"那一步按住 <kbd>空格</kbd> 或遥控器上的语音键说话；已装 BlackHole 时向导跳过"麦克风"</span>
+    <span class="opt" id="optTheme"><button data-v="auto" class="on">跟随系统</button><button data-v="light">浅色</button><button data-v="dark">深色</button></span>
+    <span class="opt" id="optBH"><button data-v="have" class="on">已装 BlackHole</button><button data-v="none">没装</button></span>
+    <span class="opt" id="optTry"><button data-v="ok" class="on">会出字</button><button data-v="fail">模拟没出字</button></span>
+    <span class="opt" id="optRM"><button data-v="rm">减少动态效果</button></span>
+    <a href="main-window.html">主窗口</a> · <a href="permissions.html">权限原型</a>
+  </div>
+</div>
+
+<script src="rc003.js"></script>
+<script>
+const $=s=>document.querySelector(s);
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+$('#remote').innerHTML=rc003SVG({prefix:'k-'});
+const win=$('#win');
+
+const STEPS=[
+  {id:'welcome'},{id:'remote', label:'遥控器'},{id:'mic', label:'麦克风'},{id:'ax', label:'权限'},{id:'typeless', label:'Typeless'},{id:'try', label:'试一试'},{id:'done'},
+];
+let cur=0, hasBH=true;
+
+function sizeHero(){ $('#hero').style.setProperty('--hw', Math.min(win.clientHeight*.66*200/840,150)+'px'); }
+sizeHero(); addEventListener('resize', sizeHero);
+
+function renderRail(){
+  const rail=$('#rail'); rail.innerHTML='';
+  STEPS.filter(s=>s.label).forEach((s)=>{
+    const i=STEPS.indexOf(s), el=document.createElement('span');
+    el.className= i<cur ? 'done' : (i===cur ? 'cur' : '');
+    el.innerHTML=`<i>${i<cur?'✓':i}</i>${s.label}`;
+    rail.appendChild(el);
+  });
+}
+
+/* island */
+const island=$('#island');
+function setIsland(st){
+  island.dataset.s=st;
+  island.querySelectorAll('.v').forEach(v=>v.classList.toggle('on', v.dataset.v===st));
+  island.style.width=Math.ceil(island.querySelector(`.v[data-v="${st}"]`).offsetWidth)+'px';
+}
+
+function go(n){
+  // The BlackHole step only shows when BlackHole is missing.
+  if (STEPS[n] && STEPS[n].id==='mic' && hasBH) n += n>=cur ? 1 : -1;
+  const prev=document.querySelector('.step.on');
+  if (prev){ prev.classList.remove('on'); prev.classList.add('off'); setTimeout(()=>prev.classList.remove('off'),300); }
+  cur=Math.max(0,Math.min(STEPS.length-1,n));
+  const step=document.querySelector(`.step[data-step="${STEPS[cur].id}"]`);
+  setTimeout(()=>step.classList.add('on'), prev ? 160 : 0);
+  renderRail();
+  win.classList.toggle('try', STEPS[cur].id==='try' && !tried);
+  $('#hero').style.setProperty('--hs', STEPS[cur].id==='welcome' ? 1.05 : 1);
+  if (STEPS[cur].id==='mic') renderMic();
+  if (STEPS[cur].id==='try') setTimeout(focusField, 500);
+}
+document.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{
+  const g=b.dataset.go; if(g==='next') go(cur+1); else if(g==='back') go(cur-1); else { reset(); go(0); }
+});
+
+/* step 1: Bluetooth (system prompt), then find the remote */
+const OK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+let btState='none';
+$('#r-go').onclick=async ()=>{
+  if (btState==='linked') return go(cur+1);
+  if (btState==='denied'){ setStatus('#r-bt','wait','<i class="spin"></i>等你在系统设置里打开'); await sleep(1500); return btGranted(); }
+  const ph=$('#ph');
+  ph.innerHTML=`<em>这里是 macOS 的系统弹窗（示意）</em>"Yaozhi"想要使用蓝牙。<br>用途说明：遥指需要蓝牙来连接遥控器并接收语音。<div class="bs"><button data-a="no">不允许</button><button data-a="yes">允许</button></div>`;
+  ph.classList.add('open');
+  ph.querySelectorAll('button').forEach(b=>b.onclick=()=>{
+    ph.classList.remove('open');
+    if (b.dataset.a==='yes') btGranted();
+    else { btState='denied'; setStatus('#r-bt','warn','已拒绝'); $('#r-bt-s').textContent='只能到 系统设置 → 隐私与安全性 → 蓝牙 里打开'; $('#r-go').textContent='去系统设置'; }
+  });
+};
+function setStatus(sel, tone, html){ const e=$(sel); e.className='st '+tone; e.innerHTML=html; }
+async function btGranted(){
+  btState='granted';
+  setStatus('#r-bt','ok',OK+'已允许'); $('#r-bt-s').textContent='连接遥控器、接收语音';
+  $('#r-go').disabled=true; $('#r-go').textContent='正在查找…';
+  setStatus('#r-dev','wait','<i class="spin"></i>查找中');
+  win.classList.add('searching'); $('#iwait').textContent='正在查找遥控器…'; setIsland('wait');
+  await sleep(2200);
+  win.classList.remove('searching'); win.classList.add('linked');
+  setStatus('#r-dev','ok',OK+'已连接'); $('#r-dev-t').textContent='小米蓝牙遥控器 2 Pro'; $('#r-dev-s').textContent='型号 RC003 · 语音通道正常';
+  $('#iok').textContent='小米蓝牙遥控器 2 Pro 已连接'; setIsland('ok');
+  $('#r-go').disabled=false; $('#r-go').textContent='继续'; btState='linked';
+}
+
+/* the BlackHole step: shown only when it is missing; yaozhi-mic on top of it
+   is made by Yaozhi and never shown here */
+function renderMic(){
+  if (hasBH){ setStatus('#m-bh','ok',OK+'已安装'); $('#m-bh-s').textContent='装好了，遥指会处理剩下的'; $('#m-cmd-row').style.display='none'; }
+  else { setStatus('#m-bh','warn','未安装'); $('#m-bh-s').textContent='在终端运行下面的命令安装，装好后遥指会自动发现'; $('#m-cmd-row').style.display=''; }
+  const go=$('#m-go'); go.disabled=!hasBH; go.textContent= hasBH ? '继续' : '等待安装…';
+}
+$('#m-go').onclick=()=>go(cur+1);
+$('#m-copy').onclick=()=>{ $('#m-copy').textContent='已复制'; setTimeout(()=>{ hasBH=true; setOpt('optBH','have'); renderMic(); },1500); };
+
+/* step 3: Accessibility */
+let axState='none';
+$('#a-go').onclick=async ()=>{
+  if (axState==='ok') return go(cur+1);
+  axState='wait'; setStatus('#a-st','wait','<i class="spin"></i>等待中'); $('#a-s').textContent='在系统设置里把 Yaozhi 拖进列表'; $('#a-go').disabled=true;
+  $('#iwait').textContent='等你在系统设置里允许…'; setIsland('wait');
+  await sleep(2000);
+  axState='ok'; setStatus('#a-st','ok',OK+'已允许'); $('#a-s').textContent='遥指可以替你点 Fn 了';
+  $('#a-go').disabled=false; $('#a-go').textContent='继续';
+  $('#iok').textContent='辅助功能已允许'; setIsland('ok');
+};
+$('#t-open').onclick=()=>{ $('#t-open').textContent='已打开（示意）'; };
+
+/* step 5: try it — Typeless writes into the wizard's own text box, and the wizard
+   notices the text arriving: no "did it work?" question */
+let tried=false, listening=false, failDemo=false, waitTimer=null, settleTimer=null;
+const field=$('#y-field'), ta=$('#y-text');
+const SAMPLE='今天下午三点开会，记得带上电脑。';
+function tryState(cls, html){ field.classList.remove('listening','got'); if(cls) field.classList.add(cls); $('#y-state').innerHTML=html; }
+function focusField(){ ta.focus(); field.classList.add('focus'); }
+ta.addEventListener('focus', ()=>field.classList.add('focus'));
+ta.addEventListener('blur', ()=>field.classList.remove('focus'));
+function down(){
+  if (STEPS[cur].id!=='try' || listening || field.classList.contains('got')) return;
+  listening=true; clearTimeout(waitTimer); win.classList.add('listening'); setIsland('listen');
+  tryState('listening','<i class="tf-dot"></i>正在听…'); focusField();
+}
+async function up(){
+  if (!listening) return; listening=false; win.classList.remove('listening');
+  $('#iwait').textContent='等 Typeless 出字…'; setIsland('wait');
+  tryState('','<i class="spin"></i>等 Typeless 出字…');
+  if (!failDemo){
+    // Prototype only: what Typeless does after the stop tap — it types into the focused field.
+    await sleep(700);
+    for (const ch of SAMPLE){ ta.value+=ch; ta.dispatchEvent(new Event('input')); await sleep(45); }
+  }
+  // No text within a few seconds: show the usual causes.
+  waitTimer=setTimeout(()=>{
+    if (field.classList.contains('got')) return;
+    tryState('','<i class="tf-dot"></i>没有收到文字');
+    $('#y-h').textContent='没收到文字，检查一下';
+    $('#y-p').textContent='常见原因在下面。改好后再按住语音键说一句，光标还在输入框里。';
+    $('#y-help').hidden=false; $('#idot').className='pdot warn'; $('#itxt').textContent='没收到文字'; setIsland('idle'); win.classList.add('try'); focusField();
+  }, 6000);
+}
+// Any text that lands in the field counts: that is Typeless typing.
+ta.addEventListener('input', ()=>{
+  $('#y-count').textContent= ta.value ? `${[...ta.value].length} 个字` : '';
+  clearTimeout(settleTimer);
+  if (!ta.value.trim()) return;
+  settleTimer=setTimeout(()=>{
+    clearTimeout(waitTimer); tried=true; win.classList.remove('try');
+    tryState('got','<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>收到了，Typeless 出字正常');
+    $('#y-h').textContent='出字了'; $('#y-p').textContent='遥控器、遥指、Typeless 都工作正常。以后在任何输入框里都这样用。';
+    $('#y-help').hidden=true; $('#y-done').hidden=false; $('#y-retry').hidden=false; $('#y-skip').hidden=true;
+    $('#iok').textContent='出字了'; setIsland('ok');
+  }, 600);
+});
+$('#y-done').onclick=()=>go(cur+1);
+$('#y-skip').onclick=()=>go(cur+1);
+$('#y-retry').onclick=()=>{ ta.value=''; ta.dispatchEvent(new Event('input')); resetTry(); win.classList.add('try'); focusField(); };
+function resetTry(){
+  clearTimeout(waitTimer); clearTimeout(settleTimer); tried=false;
+  tryState('','<i class="tf-dot"></i>等你说话'); $('#y-count').textContent='';
+  $('#y-h').textContent='按住语音键，说一句话';
+  $('#y-p').textContent='光标已经放在下面的输入框里。按住遥控器上闪着的语音键说话，松开后，Typeless 会把文字写进这里。';
+  $('#y-help').hidden=true; $('#y-done').hidden=true; $('#y-retry').hidden=true; $('#y-skip').hidden=false;
+}
+document.addEventListener('pointerdown', e=>{ if (e.target.closest('#k-voice')){ down(); addEventListener('pointerup', up, {once:true}); } });
+// Prototype: Space stands for the remote's voice key, also while the field has focus.
+addEventListener('keydown', e=>{ if (e.code==='Space'){ e.preventDefault(); if(!e.repeat) down(); } });
+addEventListener('keyup', e=>{ if (e.code==='Space' && listening){ e.preventDefault(); up(); } });
+
+function reset(){
+  btState='none'; axState='none'; tried=false;
+  win.classList.remove('linked','searching','listening');
+  setStatus('#r-bt','','未允许'); setStatus('#r-dev','','—'); $('#r-go').textContent='继续';
+  setStatus('#a-st','warn','未允许'); $('#a-go').textContent='去授权';
+  ta.value=''; resetTry();
+  $('#itxt').textContent='还没连接遥控器'; setIsland('idle');
+}
+
+/* legend */
+function setOpt(id, v){ document.querySelectorAll(`#${id} button`).forEach(x=>x.classList.toggle('on', x.dataset.v===v)); }
+const LQ=matchMedia('(prefers-color-scheme: light)'); let themePick='auto';
+function applyTheme(){ document.body.classList.toggle('light', themePick==='light' || (themePick==='auto' && LQ.matches)); }
+LQ.addEventListener('change', applyTheme); applyTheme();
+document.querySelectorAll('#optTheme button').forEach(b=>b.onclick=()=>{ themePick=b.dataset.v; setOpt('optTheme', themePick); applyTheme(); });
+document.querySelectorAll('#optBH button').forEach(b=>b.onclick=()=>{ hasBH=b.dataset.v==='have'; setOpt('optBH', b.dataset.v); renderMic(); });
+document.querySelectorAll('#optTry button').forEach(b=>b.onclick=()=>{ failDemo=b.dataset.v==='fail'; setOpt('optTry', b.dataset.v); });
+$('#optRM button').onclick=e=>e.target.classList.toggle('on', document.body.classList.toggle('rm'));
+
+reset(); go(0);
+</script>
+</body>
+</html>

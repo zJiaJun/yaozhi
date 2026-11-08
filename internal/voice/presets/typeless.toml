@@ -1,0 +1,18 @@
+# SPDX-License-Identifier: GPL-3.0-only
+#
+# Typeless：点一下 Fn 开始听写，再点一下结束。
+# 点按时长 120 ms 同 remote-mic-app（GPL-3.0-only）的 VoiceFnTapSessionController.swift；
+# 2026-11-06 用 cmd/inputprobe 真机验证过两次点按能让 Typeless 开始和结束。
+
+id         = "typeless"
+name       = "Typeless"
+microphone = "yaozhi-mic"   # Typeless 看不到 BlackHole，要在它的设置里选这个聚集设备
+
+[trigger]
+key  = "fn"
+mode = "toggle"   # toggle：点一下开始、再点一下结束；hold：按住期间听写
+
+[timing]
+tap_ms       = 120   # 每次点按按住多久
+ready_ms     = 0     # 点按开始后再等多久，才把缓存的开头语音放进麦克风
+end_delay_ms = 0     # 语音播完后再等多久，才点按结束

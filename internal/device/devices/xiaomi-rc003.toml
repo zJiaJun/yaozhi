@@ -1,0 +1,35 @@
+# SPDX-License-Identifier: GPL-3.0-only
+#
+# 小米蓝牙遥控器 2 Pro（RC003）。
+# 名字、型号和按键 usage 取自 open-voice-bridge（GPL-3.0-only）的
+# VoiceBridgeDeviceProfile.swift、AppSettings.swift 和 RemoteButtons.swift；
+# VID/PID 在 2026-11-06 用 cmd/inputprobe 真机核对过。
+
+id   = "xiaomi-rc003"
+name = "小米蓝牙遥控器 2 Pro"
+
+[match]
+names   = ["Mi RC", "Xiaomi Bluetooth Remote 2 Pro", "小米蓝牙语音遥控器"]
+models  = ["RC003"]   # 设备信息服务里的型号
+vendor  = 0x2717
+product = 0x32B8
+
+[voice]
+protocol = "atvv"
+key      = "voice"    # 按住说话；它同时会给系统发 F5，遥指要屏蔽
+
+# 每个键给系统发的 HID usage：用途页 << 32 | 用途，0x7 是键盘页。
+[keys]
+voice       = 0x7_0000_003E   # F5
+power       = 0x7_0000_0066
+up          = 0x7_0000_0052
+down        = 0x7_0000_0051
+left        = 0x7_0000_0050
+right       = 0x7_0000_004F
+ok          = 0x7_0000_0028
+back        = 0x7_0000_00F1
+home        = 0x7_0000_004A
+menu        = 0x7_0000_0065
+volume_up   = 0x7_0000_0080
+volume_down = 0x7_0000_0081
+tv          = 0x7_0000_0035

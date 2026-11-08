@@ -1,0 +1,794 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>遥指 Yaozhi · 界面方案</title>
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<style>
+:root{
+  --bg:#eef0f3; --paper:#ffffff; --panel:rgba(246,246,248,.92); --panel-solid:#f6f6f8;
+  --text:#1d1d1f; --muted:#6e6e73; --faint:#a1a1a6; --line:rgba(0,0,0,.09); --line2:rgba(0,0,0,.05);
+  --accent:#0a84ff; --accent-soft:rgba(10,132,255,.12); --ok:#30b158; --warn:#ff9f0a; --bad:#ff453a;
+  --side:#e9e9ee; --row:#ffffff; --chip:#ececf0;
+  --remote-a:#e7e7ea; --remote-b:#c9c9ce; --key:#2b2b2e; --key-ink:#f2f2f2;
+  --shadow:0 18px 50px rgba(0,0,0,.16),0 2px 8px rgba(0,0,0,.08);
+  --r:12px;
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Helvetica Neue",sans-serif;
+}
+body.dark{
+  --bg:#1b1b1d; --paper:#28282b; --panel:rgba(44,44,48,.92); --panel-solid:#2c2c30;
+  --text:#f2f2f4; --muted:#a1a1a8; --faint:#6e6e75; --line:rgba(255,255,255,.1); --line2:rgba(255,255,255,.05);
+  --accent:#0a84ff; --accent-soft:rgba(10,132,255,.22);
+  --side:#232326; --row:#323236; --chip:#3a3a3f;
+  --remote-a:#5a5a60; --remote-b:#3c3c41; --key:#18181a; --key-ink:#e8e8ea;
+  --shadow:0 18px 50px rgba(0,0,0,.5),0 2px 8px rgba(0,0,0,.4);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-size:13px;line-height:1.45;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit}
+.top{position:sticky;top:0;z-index:20;background:var(--bg);border-bottom:1px solid var(--line);padding:14px 28px 0}
+.top h1{margin:0;font-size:20px;letter-spacing:.2px}
+.top p{margin:4px 0 10px;color:var(--muted)}
+.tabs{display:flex;gap:4px;flex-wrap:wrap;align-items:flex-end}
+.tab{border:0;background:transparent;padding:9px 14px;border-radius:9px 9px 0 0;cursor:pointer;color:var(--muted);font-weight:500}
+.tab.active{background:var(--paper);color:var(--text);box-shadow:0 -1px 0 var(--line) inset}
+.tab small{display:block;font-weight:400;font-size:11px;color:var(--faint)}
+.theme{margin-left:auto;margin-bottom:8px;border:1px solid var(--line);background:var(--paper);border-radius:8px;padding:5px 10px;cursor:pointer}
+main{padding:22px 28px 60px}
+.scheme{display:none}.scheme.active{display:block}
+.intro{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:16px;margin-bottom:20px}
+.intro .card{background:var(--paper);border-radius:var(--r);padding:14px 16px;border:1px solid var(--line2)}
+.intro h2{margin:0 0 4px;font-size:17px}
+.intro h3{margin:0 0 6px;font-size:12px;color:var(--muted);font-weight:600;letter-spacing:.3px}
+.intro ul{margin:0;padding-left:18px}.intro li{margin:2px 0}
+.stage{display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap}
+.label{font-size:11px;color:var(--muted);font-weight:600;letter-spacing:.4px;margin:0 0 8px;text-transform:uppercase}
+
+/* ---------- menu bar + flyout ---------- */
+.desk{width:360px;flex:none}
+.menubar{height:26px;border-radius:8px 8px 0 0;background:linear-gradient(#d9dbe2,#cfd2da);display:flex;align-items:center;justify-content:flex-end;gap:14px;padding:0 12px;color:#111;font-size:12px}
+body.dark .menubar{background:linear-gradient(#3a3b40,#2f3035);color:#eee}
+.mb-icon{width:22px;height:18px;display:grid;place-items:center;border-radius:4px}
+.mb-icon.on{background:rgba(0,0,0,.14)} body.dark .mb-icon.on{background:rgba(255,255,255,.18)}
+.wall{background:linear-gradient(135deg,#9db7d9 0%,#c9b6dc 50%,#e6c9b3 100%);border-radius:0 0 8px 8px;padding:8px 10px 18px;display:flex;justify-content:flex-end;min-height:540px}
+body.dark .wall{background:linear-gradient(135deg,#243048 0%,#3a2d4a 50%,#4a3a30 100%)}
+.flyout{width:300px;background:var(--panel);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);border-radius:14px;box-shadow:var(--shadow);border:1px solid var(--line);padding:12px;align-self:flex-start}
+.fy-head{display:flex;align-items:center;gap:10px;padding:2px 2px 10px}
+.fy-head .t{font-weight:600;font-size:14px}
+.fy-head .s{color:var(--muted);font-size:12px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ok);display:inline-block;flex:none}
+.dot.warn{background:var(--warn)}.dot.bad{background:var(--bad)}.dot.off{background:var(--faint)}
+.tile{background:var(--row);border-radius:11px;padding:10px 11px;margin-top:8px;border:1px solid var(--line2)}
+.row{display:flex;align-items:center;gap:9px;min-height:30px}
+.row+.row{border-top:1px solid var(--line2)}
+.row .grow{flex:1;min-width:0}
+.row .sub{color:var(--muted);font-size:11.5px}
+.ic{width:26px;height:26px;border-radius:7px;display:grid;place-items:center;background:var(--chip);flex:none}
+.ic svg{width:15px;height:15px}
+.ic.blue{background:var(--accent);color:#fff}.ic.green{background:var(--ok);color:#fff}.ic.orange{background:var(--warn);color:#fff}.ic.gray{background:#8e8e93;color:#fff}
+.sw{width:34px;height:20px;border-radius:10px;background:#c7c7cc;position:relative;flex:none;cursor:pointer;transition:.2s;border:0;padding:0}
+.sw::after{content:"";position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3);transition:.2s}
+.sw.on{background:var(--ok)}.sw.on::after{left:16px}
+body.dark .sw{background:#48484d}body.dark .sw.on{background:var(--ok)}
+.btnrow{display:flex;gap:6px;margin-top:10px}
+.btn{border:1px solid var(--line);background:var(--row);border-radius:7px;padding:5px 10px;cursor:pointer;font-size:12.5px;white-space:nowrap;flex:none}
+.btn.primary{background:var(--accent);color:#fff;border-color:transparent}
+.btn.ghost{background:transparent}
+.btn.wide{flex:1;text-align:center}
+.menu-item{padding:6px 8px;border-radius:6px;display:flex;justify-content:space-between;cursor:default}
+.menu-item:hover{background:var(--accent);color:#fff}
+.menu-item kbd{font-family:inherit;color:var(--faint)}.menu-item:hover kbd{color:#fff}
+.sep{height:1px;background:var(--line);margin:8px 2px}
+.talk{margin-top:10px;width:100%;border:1px dashed var(--accent);background:var(--accent-soft);color:var(--accent);border-radius:9px;padding:8px;cursor:pointer;font-weight:600;user-select:none;touch-action:none}
+.talk.held{background:var(--accent);color:#fff;border-style:solid}
+.hint{color:var(--faint);font-size:11px;margin-top:6px;text-align:center}
+.badge{font-size:10.5px;padding:1px 6px;border-radius:5px;background:var(--chip);color:var(--muted);font-weight:600}
+.badge.m2{background:rgba(175,82,222,.14);color:#af52de}
+.badge.ok{background:rgba(48,177,88,.14);color:var(--ok)}
+.badge.warn{background:rgba(255,159,10,.16);color:#c77700}
+body.dark .badge.warn{color:var(--warn)}
+
+/* level meter */
+.meter{height:6px;border-radius:3px;background:var(--chip);overflow:hidden}
+.meter i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--ok),#9be15d 70%,var(--warn));transition:width .08s linear}
+.bars{display:flex;gap:2px;align-items:center;height:22px}
+.bars i{width:3px;border-radius:2px;background:var(--accent);height:3px;transition:height .09s}
+
+/* ---------- window ---------- */
+.win{flex:1;min-width:680px;max-width:960px;background:var(--paper);border-radius:12px;box-shadow:var(--shadow);border:1px solid var(--line);overflow:hidden}
+.titlebar{height:38px;display:flex;align-items:center;gap:8px;padding:0 14px;border-bottom:1px solid var(--line2);position:relative}
+.lights{display:flex;gap:8px}.lights i{width:12px;height:12px;border-radius:50%;background:#ff5f57}.lights i:nth-child(2){background:#febc2e}.lights i:nth-child(3){background:#28c840}
+.titlebar .ttl{position:absolute;left:0;right:0;text-align:center;font-weight:600;font-size:13px;pointer-events:none}
+.winbody{display:flex;min-height:560px}
+.side{width:190px;background:var(--side);padding:10px 8px;flex:none;border-right:1px solid var(--line2)}
+.side .it{display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:7px;cursor:pointer;margin-bottom:1px}
+.side .it.active{background:var(--accent);color:#fff}
+.side .it .ic{width:22px;height:22px;border-radius:6px}
+.side .grp{font-size:11px;color:var(--faint);padding:10px 8px 4px;font-weight:600}
+.content{flex:1;padding:20px 24px;overflow:auto}
+.content h2{margin:0 0 14px;font-size:20px}
+.group{background:var(--row);border:1px solid var(--line2);border-radius:10px;margin-bottom:16px;padding:0 12px}
+.group .row{min-height:42px}
+.gtitle{font-size:12px;color:var(--muted);margin:0 4px 6px;font-weight:600}
+.select{border:1px solid var(--line);border-radius:6px;padding:3px 24px 3px 9px;background:var(--paper);position:relative;font-size:12.5px;white-space:nowrap}
+.select::after{content:"⌃⌄";position:absolute;right:7px;top:50%;transform:translateY(-50%);font-size:8px;line-height:7px;color:var(--muted);width:6px;word-break:break-all;text-align:center}
+.slider{width:150px;height:4px;border-radius:2px;background:var(--chip);position:relative}
+.slider i{position:absolute;left:0;top:0;bottom:0;border-radius:2px;background:var(--accent)}
+.slider b{position:absolute;top:50%;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.35);transform:translate(-50%,-50%)}
+.page{display:none}.page.active{display:block}
+.note{color:var(--muted);font-size:12px;margin:-8px 4px 16px}
+
+/* remote */
+.remote svg{display:block}
+.remote .body{fill:url(#rgrad)}
+.remote .k{fill:var(--key);cursor:pointer;transition:fill .12s}
+.remote .k:hover{fill:#3d3d42}
+.remote .k.sel{fill:var(--accent)}
+.remote .k.flash{fill:var(--ok)}
+.remote .k.voice-live{fill:var(--bad)}
+.remote .g{stroke:var(--key-ink);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+.remote .gt{fill:var(--key-ink);font-size:7.5px;font-weight:700;text-anchor:middle;pointer-events:none;font-family:inherit}
+.remote .ring{fill:var(--key)}
+.remote .wedge{fill:transparent;cursor:pointer}
+.remote .wedge.sel{fill:var(--accent);opacity:.85}
+.remote .wedge.flash{fill:var(--ok);opacity:.85}
+.remote .wedge:hover{fill:rgba(255,255,255,.08)}
+
+/* scheme B */
+.bwrap{display:grid;grid-template-columns:240px 1fr;gap:20px;padding:18px 22px}
+.devchip{display:flex;align-items:center;gap:10px;background:var(--row);border:1px solid var(--line2);border-radius:10px;padding:8px 10px;margin-bottom:12px}
+.inspector .ttl2{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.inspector .ttl2 h3{margin:0;font-size:18px}
+.gest{display:grid;grid-template-columns:70px 1fr auto;gap:8px;align-items:center;padding:9px 0;border-top:1px solid var(--line2)}
+.gest:first-child{border-top:0}
+.action{background:var(--chip);border-radius:7px;padding:6px 10px;display:flex;align-items:center;gap:8px}
+.action .k2{font-family:"SF Mono",Menlo,monospace;font-size:12px;background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:0 5px}
+.profiles{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 14px}
+.pill{border:1px solid var(--line);border-radius:999px;padding:3px 10px;background:var(--row);cursor:pointer;font-size:12px}
+.pill.on{background:var(--accent);color:#fff;border-color:transparent}
+.seg{display:inline-flex;background:var(--chip);border-radius:7px;padding:2px}
+.seg span{padding:3px 10px;border-radius:5px;font-size:12px;cursor:pointer}
+.seg span.on{background:var(--paper);box-shadow:0 1px 2px rgba(0,0,0,.15)}
+.lastkey{margin-top:10px;font-size:12px;color:var(--muted);text-align:center;min-height:18px}
+
+/* scheme C pipeline */
+.pipe{display:flex;align-items:center;gap:0;margin:6px 0 18px}
+.node{flex:none;width:118px;text-align:center}
+.node .nb{width:54px;height:54px;border-radius:16px;margin:0 auto 6px;display:grid;place-items:center;background:var(--row);border:1px solid var(--line);position:relative;transition:.2s}
+.node .nb svg{width:24px;height:24px}
+.node .nb .st{position:absolute;right:-4px;bottom:-4px;width:16px;height:16px;border-radius:50%;border:2px solid var(--paper);background:var(--ok)}
+.node .nb .st.warn{background:var(--warn)}.node .nb .st.off{background:var(--faint)}
+.node.live .nb{border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
+.node b{display:block;font-size:12.5px}.node span{color:var(--muted);font-size:11px}
+.link{flex:1;height:2px;background:var(--line);position:relative;overflow:hidden;min-width:20px}
+.link.live::after{content:"";position:absolute;top:0;left:-40%;width:40%;height:100%;background:linear-gradient(90deg,transparent,var(--accent),transparent);animation:flow .7s linear infinite}
+@keyframes flow{to{left:100%}}
+.mini-pipe{display:flex;align-items:center;gap:4px;margin:4px 0}
+.mini-pipe .mn{width:24px;height:24px;border-radius:7px;background:var(--chip);display:grid;place-items:center;position:relative}
+.mini-pipe .mn svg{width:13px;height:13px}
+.mini-pipe .mn::after{content:"";position:absolute;right:-2px;bottom:-2px;width:8px;height:8px;border-radius:50%;background:var(--ok);border:1.5px solid var(--panel-solid)}
+.mini-pipe .mn.warn::after{background:var(--warn)}
+.mini-pipe .ml{flex:1;height:2px;background:var(--line);position:relative;overflow:hidden}
+.mini-pipe .ml.live::after{content:"";position:absolute;top:0;left:-40%;width:40%;height:100%;background:linear-gradient(90deg,transparent,var(--accent),transparent);animation:flow .7s linear infinite}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+.stat{background:var(--row);border:1px solid var(--line2);border-radius:10px;padding:10px 12px}
+.stat .v{font-size:22px;font-weight:600;font-variant-numeric:tabular-nums}
+.stat .l{color:var(--muted);font-size:11.5px}
+.log{font-family:"SF Mono",Menlo,monospace;font-size:11.5px;background:var(--row);border:1px solid var(--line2);border-radius:10px;padding:8px 12px;color:var(--muted);max-height:150px;overflow:auto}
+.log div{padding:2px 0}
+.log .okc{color:var(--ok)}
+.sess{display:flex;justify-content:space-between;font-size:12px;padding:5px 2px;border-top:1px solid var(--line2)}
+.sess:first-child{border-top:0}
+
+/* wizard */
+.wiz{display:grid;grid-template-columns:230px 1fr;min-height:520px}
+.steps{background:var(--side);padding:18px 12px;border-right:1px solid var(--line2)}
+.step{display:flex;gap:10px;align-items:center;padding:7px 8px;border-radius:8px;cursor:pointer;color:var(--muted)}
+.step .n{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;border:1.5px solid var(--faint);font-size:11px;font-weight:600;flex:none}
+.step.done{color:var(--text)}.step.done .n{background:var(--ok);border-color:var(--ok);color:#fff}
+.step.cur{background:var(--paper);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.06)}.step.cur .n{border-color:var(--accent);color:var(--accent)}
+.wcontent{padding:30px 36px;display:flex;flex-direction:column}
+.wcontent h2{margin:0 0 6px;font-size:22px}
+.wcontent .lead{color:var(--muted);margin:0 0 20px;max-width:560px}
+.wfoot{margin-top:auto;display:flex;justify-content:space-between;align-items:center;padding-top:20px}
+.check{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;background:var(--row);border:1px solid var(--line2);border-radius:10px;margin-bottom:8px}
+.check .ic{margin-top:1px}
+.check b{display:block}
+.illus{display:flex;gap:24px;align-items:center}
+.bigmeter{height:12px;border-radius:6px;background:var(--chip);overflow:hidden;margin:10px 0 6px}
+.bigmeter i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--ok),#9be15d 70%,var(--warn));transition:width .08s}
+.result{min-height:60px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--paper);color:var(--muted)}
+
+/* compare */
+table.cmp{width:100%;border-collapse:separate;border-spacing:0;background:var(--paper);border-radius:12px;overflow:hidden;border:1px solid var(--line2)}
+.cmp th,.cmp td{padding:10px 12px;text-align:left;vertical-align:top;border-top:1px solid var(--line2)}
+.cmp thead th{background:var(--side);border-top:0;font-size:12.5px}
+.cmp td:first-child{color:var(--muted);width:150px;font-weight:600;font-size:12px}
+.reco{background:var(--paper);border:2px solid var(--accent);border-radius:12px;padding:16px 18px;margin-top:20px}
+.reco h3{margin:0 0 8px}
+.icons{display:flex;gap:20px;flex-wrap:wrap;margin-top:6px}
+.icons div{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:11.5px;color:var(--muted)}
+.icons .box{width:44px;height:28px;border-radius:6px;background:linear-gradient(#d9dbe2,#cfd2da);display:grid;place-items:center;color:#111}
+body.dark .icons .box{background:linear-gradient(#3a3b40,#2f3035);color:#eee}
+.anno{font-size:11.5px;color:var(--muted);background:var(--paper);border:1px dashed var(--line);border-radius:8px;padding:8px 10px;margin-top:14px;max-width:360px}
+.anno b{color:var(--text)}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <linearGradient id="rgrad" x1="0" x2="1">
+      <stop offset="0" stop-color="var(--remote-b)"/><stop offset=".45" stop-color="var(--remote-a)"/><stop offset="1" stop-color="var(--remote-b)"/>
+    </linearGradient>
+    <symbol id="i-remote" viewBox="0 0 24 24"><rect x="8" y="2.5" width="8" height="19" rx="4" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="9" r="2.2" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="15.5" r=".9" fill="currentColor"/><circle cx="12" cy="18.3" r=".9" fill="currentColor"/></symbol>
+    <symbol id="i-remote-fill" viewBox="0 0 24 24"><rect x="8" y="2.5" width="8" height="19" rx="4" fill="currentColor"/><circle cx="12" cy="9" r="2.2" fill="var(--panel-solid)"/></symbol>
+    <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+    <symbol id="i-wave" viewBox="0 0 24 24"><path d="M4 12h2M8 8v8M12 5v14M16 8v8M20 11v2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></symbol>
+    <symbol id="i-key" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M7 10h.01M11 10h.01M15 10h.01M8 14h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+    <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 11v5M12 8h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+    <symbol id="i-bh" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="3.5" fill="currentColor"/></symbol>
+    <symbol id="i-text" viewBox="0 0 24 24"><path d="M5 6h14M12 6v12M8 18h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" fill="none"/></symbol>
+    <symbol id="i-chip" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="3" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M9 3v3M15 3v3M9 18v3M15 18v3M3 9h3M3 15h3M18 9h3M18 15h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></symbol>
+    <symbol id="i-bt" viewBox="0 0 24 24"><path d="M7 7l10 10-5 4V3l5 4L7 17" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/></symbol>
+    <symbol id="i-app" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="2" fill="currentColor"/><rect x="13" y="4" width="7" height="7" rx="2" fill="currentColor" opacity=".55"/><rect x="4" y="13" width="7" height="7" rx="2" fill="currentColor" opacity=".55"/><rect x="13" y="13" width="7" height="7" rx="2" fill="currentColor"/></symbol>
+    <symbol id="i-warn" viewBox="0 0 24 24"><path d="M12 4l9 16H3z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M12 10v4M12 17h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  </defs>
+</svg>
+
+<header class="top">
+  <h1>遥指 Yaozhi · 界面方案</h1>
+  <p>三个设计方向 + 共用的首次设置向导。面板里的"按住说话"按钮、遥控器上的按键都可以点，用来演示状态变化。界面按 MyGo 原生组件能实现的范围设计（菜单栏弹出面板、侧边栏、开关、分段控件、电平条、矢量绘图）。</p>
+  <div class="tabs" id="tabs">
+    <button class="tab active" data-tab="a">方案 A · 原生克制<small>像系统设置</small></button>
+    <button class="tab" data-tab="b">方案 B · 遥控器为中心<small>按键是主角</small></button>
+    <button class="tab" data-tab="c">方案 C · 链路仪表盘<small>状态一目了然</small></button>
+    <button class="tab" data-tab="w">首次设置向导<small>三个方案共用</small></button>
+    <button class="tab" data-tab="x">对比与推荐<small>我的建议</small></button>
+    <button class="theme" id="theme">切换深色 / 浅色</button>
+  </div>
+</header>
+
+<main>
+<!-- ================= A ================= -->
+<section class="scheme active" id="s-a">
+  <div class="intro">
+    <div class="card"><h2>方案 A · 原生克制</h2>像 macOS 的"控制中心"和"系统设置"：菜单栏面板是几行状态和开关，设置窗口是左侧栏 + 分组列表。遥控器图只在"按键"页出现。</div>
+    <div class="card"><h3>好处</h3><ul><li>一眼像系统自带工具，学习成本最低</li><li>MyGo 原生组件直接拼，工作量最小</li><li>设置项多了也不乱</li></ul></div>
+    <div class="card"><h3>代价</h3><ul><li>辨识度弱，"用遥控器控制 Mac"的感觉不强</li><li>链路出问题时，要逐行看哪一项变黄</li></ul></div>
+  </div>
+  <div class="stage">
+    <div class="desk">
+      <div class="label">菜单栏面板</div>
+      <div class="menubar"><span>Wi-Fi</span><span class="mb-icon on" data-mbicon><svg width="16" height="16"><use href="#i-remote"/></svg></span><span>周五 21:40</span></div>
+      <div class="wall">
+        <div class="flyout" data-flyout>
+          <div class="fy-head">
+            <div class="ic blue"><svg><use href="#i-remote"/></svg></div>
+            <div class="grow"><div class="t">遥指</div><div class="s"><span class="dot"></span> 小米蓝牙遥控器 2 Pro · 已连接</div></div>
+          </div>
+          <div class="tile">
+            <div class="row"><div class="ic green"><svg><use href="#i-mic"/></svg></div><div class="grow"><div>语音输入</div><div class="sub" data-voice-text>按住遥控器语音键说话</div></div><button class="sw on"></button></div>
+            <div class="row" data-meter-row style="display:none"><div class="grow"><div class="meter"><i data-meter></i></div></div></div>
+            <div class="row"><div class="ic gray"><svg><use href="#i-key"/></svg></div><div class="grow"><div>按键映射 <span class="badge m2">M2</span></div><div class="sub">方案：通用 · 跟随当前 App</div></div><button class="sw on"></button></div>
+          </div>
+          <div class="tile">
+            <div class="row"><span class="dot"></span><div class="grow">输入法</div><span class="sub">Typeless</span></div>
+            <div class="row"><span class="dot"></span><div class="grow">麦克风</div><span class="sub">yaozhi-mic</span></div>
+            <div class="row"><span class="dot"></span><div class="grow">权限</div><span class="sub">全部已授权</span></div>
+          </div>
+          <div class="sep"></div>
+          <div class="menu-item">设置…<kbd>⌘,</kbd></div>
+          <div class="menu-item">暂停 1 小时</div>
+          <div class="menu-item">退出遥指<kbd>⌘Q</kbd></div>
+          <button class="talk" data-talk>按住这里 = 按住遥控器语音键（演示）</button>
+        </div>
+      </div>
+      <div class="anno"><b>菜单栏图标</b>用模板图标，跟随浅色/深色菜单栏；说话时图标换成波形，出问题时加一个橙点（见"对比与推荐"页的图标状态）。</div>
+    </div>
+
+    <div class="win">
+      <div class="titlebar"><div class="lights"><i></i><i></i><i></i></div><div class="ttl">遥指</div></div>
+      <div class="winbody">
+        <div class="side" data-side="a">
+          <div class="it active" data-page="a1"><div class="ic blue"><svg><use href="#i-remote"/></svg></div>设备</div>
+          <div class="it" data-page="a2"><div class="ic green"><svg><use href="#i-mic"/></svg></div>语音输入</div>
+          <div class="it" data-page="a3"><div class="ic gray"><svg><use href="#i-key"/></svg></div>按键 <span class="badge m2" style="margin-left:auto">M2</span></div>
+          <div class="it" data-page="a4"><div class="ic orange"><svg><use href="#i-shield"/></svg></div>权限与诊断</div>
+          <div class="it" data-page="a5"><div class="ic gray"><svg><use href="#i-info"/></svg></div>关于</div>
+        </div>
+        <div class="content">
+          <div class="page active" id="a1">
+            <h2>设备</h2>
+            <div class="group">
+              <div class="row"><div class="ic blue"><svg><use href="#i-remote"/></svg></div><div class="grow"><div>小米蓝牙遥控器 2 Pro</div><div class="sub">RC003 · ATVV 1.0 · 16 kHz</div></div><span class="badge ok">已连接</span></div>
+              <div class="row"><div class="grow">断线后自动重连</div><button class="sw on"></button></div>
+              <div class="row"><div class="grow">电量</div><span class="sub">—（待 M1 确认能否读取）</span></div>
+            </div>
+            <div class="gtitle">添加设备</div>
+            <div class="group">
+              <div class="row"><div class="grow"><div>配对新遥控器</div><div class="sub">同时按住遥控器"主页"和"菜单"键，再到"系统设置 → 蓝牙"里连接</div></div><button class="btn">打开蓝牙设置</button></div>
+              <div class="row"><div class="grow"><div>支持的设备</div><div class="sub">目前：小米蓝牙遥控器 2 Pro（RC003）。之后会支持更多 ATVV 遥控器</div></div></div>
+            </div>
+          </div>
+          <div class="page" id="a2">
+            <h2>语音输入</h2>
+            <div class="group">
+              <div class="row"><div class="grow">启用语音输入</div><button class="sw on"></button></div>
+              <div class="row"><div class="grow"><div>输入法</div><div class="sub">遥指在开始和结束时各模拟一次 Fn 点按</div></div><span class="select">Typeless</span></div>
+              <div class="row"><div class="grow"><div>麦克风设备</div><div class="sub">原版 BlackHole 2ch，经聚集设备给 Typeless 用</div></div><span class="select">yaozhi-mic</span></div>
+              <div class="row"><div class="grow">增益</div><div class="slider"><i style="width:35%"></i><b style="left:35%"></b></div><span class="sub" style="width:44px;text-align:right">+6 dB</span></div>
+            </div>
+            <div class="gtitle">检查</div>
+            <div class="group">
+              <div class="row"><span class="dot"></span><div class="grow">BlackHole 2ch 已安装</div></div>
+              <div class="row"><span class="dot"></span><div class="grow">聚集设备 yaozhi-mic 存在</div></div>
+              <div class="row"><span class="dot warn"></span><div class="grow"><div>Typeless 是否选了 yaozhi-mic</div><div class="sub">遥指读不到 Typeless 的设置，用测试音让你确认</div></div><button class="btn">播放测试音</button></div>
+            </div>
+          </div>
+          <div class="page" id="a3">
+            <h2>按键 <span class="badge m2">M2</span></h2>
+            <div class="note">第一版只做语音；这里先占位，M2 开放。</div>
+            <div style="display:flex;gap:20px">
+              <div class="remote" data-remote="a" style="width:110px"></div>
+              <div style="flex:1">
+                <div class="group">
+                  <div class="row"><div class="grow">确定键</div><span class="sub">单击 Return · 长按 ⌥⌘L</span></div>
+                  <div class="row"><div class="grow">主页键</div><span class="sub">单击 显示桌面</span></div>
+                  <div class="row"><div class="grow">菜单键</div><span class="sub">单击 调度中心</span></div>
+                  <div class="row"><div class="grow">返回键</div><span class="sub">单击 Esc</span></div>
+                  <div class="row"><div class="grow">电源键</div><span class="sub">已转为 F20，可再映射</span></div>
+                  <div class="row"><div class="grow">语音键</div><span class="badge">固定：语音输入</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="page" id="a4">
+            <h2>权限与诊断</h2>
+            <div class="group">
+              <div class="row"><span class="dot"></span><div class="grow"><div>蓝牙</div><div class="sub">连接遥控器、接收语音</div></div></div>
+              <div class="row"><span class="dot"></span><div class="grow"><div>辅助功能</div><div class="sub">模拟 Fn 点按、执行按键动作</div></div></div>
+              <div class="row"><span class="dot off"></span><div class="grow"><div>输入监控</div><div class="sub">M2 读取遥控器按键时需要</div></div><button class="btn">去授权</button></div>
+            </div>
+            <div class="group">
+              <div class="row"><div class="grow"><div>导出诊断信息</div><div class="sub">只含连接、时序和错误，不含语音和你打的字</div></div><button class="btn">导出…</button></div>
+            </div>
+          </div>
+          <div class="page" id="a5">
+            <h2>关于</h2>
+            <div class="group"><div class="row"><div class="grow"><div>遥指 Yaozhi 0.1</div><div class="sub">用遥控器控制 Mac · GPL-3.0-only</div></div><button class="btn">检查更新</button></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= B ================= -->
+<section class="scheme" id="s-b">
+  <div class="intro">
+    <div class="card"><h2>方案 B · 遥控器为中心</h2>主窗口就是一支矢量遥控器：点哪个键就在右边配置哪个键，语音键点开就是语音设置。按下实体键时图上实时高亮。菜单栏面板也放一支小遥控器。</div>
+    <div class="card"><h3>好处</h3><ul><li>和"用遥控器控制 Mac"的定位最贴，辨识度高</li><li>M2 的按键映射、单击/双击/长按天然有位置</li><li>换设备时只换一张矢量图和键位表，正好对应设备适配层</li></ul></div>
+    <div class="card"><h3>代价</h3><ul><li>要画、要维护每款设备的矢量图</li><li>M1 只有语音时，整张遥控器大多数键还是"未开放"</li><li>链路状态需要另找位置放</li></ul></div>
+  </div>
+  <div class="stage">
+    <div class="desk">
+      <div class="label">菜单栏面板</div>
+      <div class="menubar"><span>Wi-Fi</span><span class="mb-icon on" data-mbicon><svg width="16" height="16"><use href="#i-remote"/></svg></span><span>周五 21:40</span></div>
+      <div class="wall">
+        <div class="flyout" data-flyout>
+          <div class="fy-head">
+            <div class="grow"><div class="t">小米蓝牙遥控器 2 Pro</div><div class="s"><span class="dot"></span> 已连接 · 方案：通用</div></div>
+            <button class="btn ghost" title="设置"><svg width="15" height="15"><use href="#i-gear"/></svg></button>
+          </div>
+          <div style="display:flex;gap:12px;align-items:center">
+            <div class="remote" data-remote="bmini" style="width:62px"></div>
+            <div style="flex:1">
+              <div class="tile" style="margin-top:0">
+                <div class="row"><div class="grow"><div>语音输入</div><div class="sub" data-voice-text>按住语音键说话</div></div><button class="sw on"></button></div>
+                <div class="row"><div class="grow"><div>按键映射 <span class="badge m2">M2</span></div><div class="sub">跟随当前 App</div></div><button class="sw on"></button></div>
+              </div>
+              <div class="bars" data-bars style="margin-top:8px"></div>
+              <div class="lastkey" data-lastkey>最近：确定键 → Return</div>
+            </div>
+          </div>
+          <button class="talk" data-talk>按住这里 = 按住遥控器语音键（演示）</button>
+          <div class="hint">点小遥控器上的键，模拟按下实体键</div>
+        </div>
+      </div>
+      <div class="anno"><b>小遥控器</b>是给"我刚才按的是哪个键、触发了什么"一个即时反馈，调按键时特别有用。</div>
+    </div>
+
+    <div class="win">
+      <div class="titlebar"><div class="lights"><i></i><i></i><i></i></div><div class="ttl">遥指</div></div>
+      <div class="bwrap">
+        <div>
+          <div class="devchip"><div class="ic blue"><svg><use href="#i-remote"/></svg></div><div class="grow"><div style="font-weight:600">小米蓝牙遥控器 2 Pro</div><div class="sub" style="color:var(--muted);font-size:11.5px"><span class="dot"></span> 已连接</div></div><span class="select">切换</span></div>
+          <div class="remote" data-remote="b" style="width:150px;margin:0 auto"></div>
+          <div class="lastkey">点任意键进行配置；按实体键会同步高亮</div>
+        </div>
+        <div class="inspector" id="b-inspector"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= C ================= -->
+<section class="scheme" id="s-c">
+  <div class="intro">
+    <div class="card"><h2>方案 C · 链路仪表盘</h2>把"遥控器 → 遥指 → BlackHole → Typeless"这条链路画出来，每一环都有状态灯，说话时能看到声音一路流过去。按键映射作为单独一页。</div>
+    <div class="card"><h3>好处</h3><ul><li>哪一环坏了一眼就知道，最利于排查和首次设置</li><li>把"等播完再结束"等时序做成可见的数据，方便调优</li><li>M3 接入更多设备时，左边的节点换成设备列表即可</li></ul></div>
+    <div class="card"><h3>代价</h3><ul><li>偏工程味，日常用户其实只关心"能不能用"</li><li>按键映射不在主视图，弱化了长期核心</li></ul></div>
+  </div>
+  <div class="stage">
+    <div class="desk">
+      <div class="label">菜单栏面板</div>
+      <div class="menubar"><span>Wi-Fi</span><span class="mb-icon on" data-mbicon><svg width="16" height="16"><use href="#i-remote"/></svg></span><span>周五 21:40</span></div>
+      <div class="wall">
+        <div class="flyout" data-flyout>
+          <div class="fy-head"><div class="grow"><div class="t">遥指</div><div class="s" data-voice-text>一切正常，按住语音键说话</div></div><button class="sw on"></button></div>
+          <div class="tile">
+            <div class="mini-pipe" data-minipipe>
+              <div class="mn" title="遥控器"><svg><use href="#i-remote"/></svg></div><div class="ml"></div>
+              <div class="mn" title="遥指"><svg><use href="#i-chip"/></svg></div><div class="ml"></div>
+              <div class="mn" title="BlackHole / yaozhi-mic"><svg><use href="#i-bh"/></svg></div><div class="ml"></div>
+              <div class="mn" title="Typeless"><svg><use href="#i-text"/></svg></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;color:var(--muted);font-size:10.5px;margin-top:2px"><span>遥控器</span><span>遥指</span><span>麦克风</span><span>Typeless</span></div>
+            <div class="meter" style="margin-top:10px"><i data-meter></i></div>
+          </div>
+          <div class="tile">
+            <div style="font-size:11.5px;color:var(--muted);margin-bottom:4px">最近几次（不记录内容）</div>
+            <div data-sessions>
+              <div class="sess"><span>21:38</span><span>5.2 秒</span><span class="badge ok">已出字</span></div>
+              <div class="sess"><span>21:31</span><span>2.3 秒</span><span class="badge ok">已出字</span></div>
+            </div>
+          </div>
+          <div class="btnrow"><button class="btn wide">设置…</button><button class="btn wide">退出</button></div>
+          <button class="talk" data-talk>按住这里 = 按住遥控器语音键（演示）</button>
+        </div>
+      </div>
+      <div class="anno"><b>链路条</b>的四个点平时都是绿的；任何一环出问题变橙，点它直接跳到对应的修复说明。</div>
+    </div>
+
+    <div class="win">
+      <div class="titlebar"><div class="lights"><i></i><i></i><i></i></div><div class="ttl">遥指</div></div>
+      <div class="winbody">
+        <div class="side">
+          <div class="it active"><div class="ic blue"><svg><use href="#i-wave"/></svg></div>概览</div>
+          <div class="it"><div class="ic gray"><svg><use href="#i-key"/></svg></div>按键 <span class="badge m2" style="margin-left:auto">M2</span></div>
+          <div class="it"><div class="ic orange"><svg><use href="#i-shield"/></svg></div>权限</div>
+          <div class="it"><div class="ic gray"><svg><use href="#i-info"/></svg></div>关于</div>
+        </div>
+        <div class="content">
+          <h2>概览</h2>
+          <div class="pipe" data-pipe>
+            <div class="node"><div class="nb"><svg><use href="#i-remote"/></svg><i class="st"></i></div><b>遥控器</b><span>RC003 已连接</span></div>
+            <div class="link"></div>
+            <div class="node"><div class="nb"><svg><use href="#i-chip"/></svg><i class="st"></i></div><b>遥指</b><span>解码 16 kHz</span></div>
+            <div class="link"></div>
+            <div class="node"><div class="nb"><svg><use href="#i-bh"/></svg><i class="st"></i></div><b>yaozhi-mic</b><span>BlackHole 2ch</span></div>
+            <div class="link"></div>
+            <div class="node"><div class="nb"><svg><use href="#i-text"/></svg><i class="st warn"></i></div><b>Typeless</b><span>请确认已选 yaozhi-mic</span></div>
+          </div>
+          <div class="cards">
+            <div class="stat"><div class="v">170 ms</div><div class="l">按下到第一包音频（遥控器决定）</div></div>
+            <div class="stat"><div class="v" data-drain>89 ms</div><div class="l">松开后音频播完（之后才点结束）</div></div>
+            <div class="stat"><div class="v" data-count>12</div><div class="l">今天说话次数</div></div>
+          </div>
+          <div class="gtitle">事件（只记录时序，不记录语音和文字）</div>
+          <div class="log" data-log>
+            <div>21:38:02.114 遥控器 开始推流</div>
+            <div>21:38:02.281 Fn 点按 → Typeless 开始</div>
+            <div>21:38:07.330 遥控器 停止，等待播完</div>
+            <div class="okc">21:38:07.419 播完 89 ms → Fn 点按结束</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= Wizard ================= -->
+<section class="scheme" id="s-w">
+  <div class="intro">
+    <div class="card"><h2>首次设置向导</h2>第一次打开时出现，三个方案共用。每一步都自动检测，做完自动打勾；可以随时从设置里重新打开。</div>
+    <div class="card"><h3>用户要亲手做的</h3><ul><li>配对遥控器（一次）</li><li>点"允许"授权蓝牙、辅助功能</li><li>装原版 BlackHole（向导给命令）</li><li>在 Typeless 里选 yaozhi-mic（一次）</li></ul></div>
+    <div class="card"><h3>待你决定</h3><ul><li>聚集设备由遥指自动创建，还是引导手动创建（这里两种都画了）</li></ul></div>
+  </div>
+  <div class="win" style="max-width:900px">
+    <div class="titlebar"><div class="lights"><i></i><i></i><i></i></div><div class="ttl">欢迎使用遥指</div></div>
+    <div class="wiz">
+      <div class="steps" id="wsteps"></div>
+      <div class="wcontent" id="wcontent"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= Compare ================= -->
+<section class="scheme" id="s-x">
+  <table class="cmp">
+    <thead><tr><th></th><th>A · 原生克制</th><th>B · 遥控器为中心</th><th>C · 链路仪表盘</th></tr></thead>
+    <tbody>
+      <tr><td>打开后先看到</td><td>设备状态和开关列表</td><td>一支遥控器</td><td>四个节点的链路图</td></tr>
+      <tr><td>贴合产品定位</td><td>一般</td><td>最强（控制 Mac 是长期核心）</td><td>偏语音</td></tr>
+      <tr><td>M1（只有语音）</td><td>合适</td><td>大部分键暂未开放，略空</td><td>最合适</td></tr>
+      <tr><td>M2（按键映射）</td><td>能用，但要另画遥控器</td><td>最合适</td><td>要单独一页</td></tr>
+      <tr><td>排查问题</td><td>逐行看状态</td><td>需另放链路状态</td><td>最直观</td></tr>
+      <tr><td>多设备（M3）</td><td>列表加一行</td><td>每款设备一张矢量图</td><td>链路左端换成设备列表</td></tr>
+      <tr><td>MyGo 实现量</td><td>小</td><td>中（矢量遥控器、命中区域、高亮动画）</td><td>中（链路动画、事件流）</td></tr>
+    </tbody>
+  </table>
+
+  <div class="reco">
+    <h3>我的推荐：B 做骨架，A 做设置页，C 的链路条放进面板和诊断</h3>
+    <ul>
+      <li><b>主窗口</b>用 B：遥控器是主角，点语音键进语音设置，点其他键进按键设置（M1 时其他键显示"M2 开放"）。这样从第一版起界面就在讲"用遥控器控制 Mac"。</li>
+      <li><b>设置细项</b>（设备、权限、诊断、关于）用 A 的系统设置风格分组列表，放在左侧栏里，跟遥控器页并列。</li>
+      <li><b>菜单栏面板</b>用 C 的四节点链路条 + A 的开关：日常一眼确认"能不能用"，说话时能看到声音流过。</li>
+      <li><b>向导</b>最后一步"试一试"复用链路条，和日常面板长得一样，用户学一次就懂。</li>
+    </ul>
+    <div class="label" style="margin-top:14px">菜单栏图标状态（模板图标）</div>
+    <div class="icons">
+      <div><span class="box"><svg width="16" height="16" style="opacity:.45"><use href="#i-remote"/></svg></span>未连接</div>
+      <div><span class="box"><svg width="16" height="16"><use href="#i-remote"/></svg></span>已连接</div>
+      <div><span class="box"><svg width="16" height="16"><use href="#i-wave"/></svg></span>正在说话</div>
+      <div><span class="box" style="position:relative"><svg width="16" height="16"><use href="#i-remote"/></svg><i style="position:absolute;right:9px;top:5px;width:6px;height:6px;border-radius:50%;background:var(--warn)"></i></span>需要处理</div>
+    </div>
+  </div>
+</section>
+</main>
+
+<script>
+// ---------- tabs & theme ----------
+const tabs = document.querySelectorAll('.tab');
+tabs.forEach(t => t.addEventListener('click', () => {
+  tabs.forEach(x => x.classList.toggle('active', x === t));
+  document.querySelectorAll('.scheme').forEach(s => s.classList.toggle('active', s.id === 's-' + t.dataset.tab));
+}));
+if (matchMedia('(prefers-color-scheme: dark)').matches) document.body.classList.add('dark');
+document.getElementById('theme').onclick = () => document.body.classList.toggle('dark');
+document.querySelectorAll('.sw').forEach(s => s.addEventListener('click', () => s.classList.toggle('on')));
+
+// scheme A sidebar pages
+document.querySelectorAll('[data-side="a"] .it').forEach(it => it.addEventListener('click', () => {
+  document.querySelectorAll('[data-side="a"] .it').forEach(x => x.classList.toggle('active', x === it));
+  document.querySelectorAll('#s-a .page').forEach(p => p.classList.toggle('active', p.id === it.dataset.page));
+}));
+
+// ---------- vector remote (our own drawing, not a photo) ----------
+const KEYS = {
+  power:{name:'电源键', note:'遥指把它转成 F20，避免误触关机，再按你的设置执行', g:{single:'锁屏', double:'未设置', long:'未设置'}},
+  voice:{name:'语音键', fixed:true},
+  up:{name:'上键', g:{single:'↑', double:'未设置', long:'连续 ↑'}, repeat:true},
+  down:{name:'下键', g:{single:'↓', double:'未设置', long:'连续 ↓'}, repeat:true},
+  left:{name:'左键', g:{single:'←', double:'⌃← 切换桌面', long:'连续 ←'}, repeat:true},
+  right:{name:'右键', g:{single:'→', double:'⌃→ 切换桌面', long:'连续 →'}, repeat:true},
+  ok:{name:'确定键', g:{single:'Return', double:'播放 / 暂停', long:'⌥⌘L'}},
+  back:{name:'返回键', g:{single:'Esc', double:'⌘W', long:'未设置'}},
+  home:{name:'主页键', g:{single:'显示桌面', double:'⌘Tab 切换应用', long:'打开启动台'}},
+  menu:{name:'菜单键', g:{single:'调度中心', double:'未设置', long:'未设置'}},
+  volup:{name:'音量 +', g:{single:'系统音量 +', double:'未设置', long:'连续 +'}, repeat:true},
+  voldown:{name:'音量 −', g:{single:'系统音量 −', double:'未设置', long:'连续 −'}, repeat:true},
+  tv:{name:'TV 键', g:{single:'打开 App…', double:'未设置', long:'未设置'}},
+};
+function wedge(cx, cy, r1, r2, a0, a1){
+  const p = (r,a)=>[cx + r*Math.cos(a*Math.PI/180), cy + r*Math.sin(a*Math.PI/180)];
+  const [x0,y0]=p(r2,a0),[x1,y1]=p(r2,a1),[x2,y2]=p(r1,a1),[x3,y3]=p(r1,a0);
+  return `M${x0},${y0} A${r2},${r2} 0 0 1 ${x1},${y1} L${x2},${y2} A${r1},${r1} 0 0 0 ${x3},${y3} Z`;
+}
+function remoteSVG(){
+  const cx=60, cy=128;
+  return `<svg viewBox="0 0 120 330" width="100%">
+  <rect class="body" x="14" y="6" width="92" height="318" rx="46" stroke="rgba(0,0,0,.18)"/>
+  <circle class="k" data-k="power" cx="40" cy="44" r="11"/>
+  <path class="g" d="M40 38v5M35.5 41a6.2 6.2 0 1 0 9 0"/>
+  <circle class="k" data-k="voice" cx="80" cy="44" r="11"/>
+  <rect x="77.3" y="37.5" width="5.4" height="8.5" rx="2.7" class="g"/><path class="g" d="M75 44a5 5 0 0 0 10 0M80 49v1.5"/>
+  <circle class="ring" cx="${cx}" cy="${cy}" r="40"/>
+  <path class="wedge" data-k="up" d="${wedge(cx,cy,19,40,-135,-45)}"/>
+  <path class="wedge" data-k="right" d="${wedge(cx,cy,19,40,-45,45)}"/>
+  <path class="wedge" data-k="down" d="${wedge(cx,cy,19,40,45,135)}"/>
+  <path class="wedge" data-k="left" d="${wedge(cx,cy,19,40,135,225)}"/>
+  <circle cx="${cx}" cy="${cy}" r="18" fill="rgba(255,255,255,.08)"/>
+  <circle class="k" data-k="ok" cx="${cx}" cy="${cy}" r="16"/>
+  <circle class="k" data-k="back" cx="38" cy="196" r="13"/><path class="g" d="M40 191l-5 5 5 5"/>
+  <circle class="k" data-k="home" cx="38" cy="234" r="13"/><path class="g" d="M32.5 235l5.5-5 5.5 5M34.5 234v5h7v-5"/>
+  <circle class="k" data-k="menu" cx="38" cy="272" r="13"/><path class="g" d="M33 268h10M33 272h10M33 276h10"/>
+  <path class="k" data-k="volup" d="M69 196a13 13 0 0 1 26 0v19h-26z"/>
+  <path class="k" data-k="voldown" d="M69 215h26v19a13 13 0 0 1 -26 0z"/>
+  <path class="g" d="M82 199v8M78 203h8M78 228h8" />
+  <line x1="70" y1="215" x2="94" y2="215" stroke="rgba(255,255,255,.12)"/>
+  <circle class="k" data-k="tv" cx="82" cy="272" r="13"/><text class="gt" x="82" y="274.8">TV</text>
+  </svg>`;
+}
+document.querySelectorAll('[data-remote]').forEach(el => el.innerHTML = remoteSVG());
+
+function flashKey(root, k){
+  root.querySelectorAll(`[data-k="${k}"]`).forEach(n => { n.classList.add('flash'); setTimeout(()=>n.classList.remove('flash'), 260); });
+}
+
+// ---------- scheme B inspector ----------
+const insp = document.getElementById('b-inspector');
+const bRemote = document.querySelector('[data-remote="b"]');
+function selectKey(k){
+  bRemote.querySelectorAll('[data-k]').forEach(n => n.classList.toggle('sel', n.dataset.k === k));
+  const d = KEYS[k];
+  if (d.fixed){
+    insp.innerHTML = `
+      <div class="ttl2"><div class="ic green"><svg><use href="#i-mic"/></svg></div><h3>语音键</h3><span class="badge">固定：语音输入</span></div>
+      <div class="note" style="margin:0 0 14px">按住说话，松开出字。遥指屏蔽它原本发出的 F5，自己在开始和结束时各点一次 Fn 交给 Typeless。</div>
+      <div class="group">
+        <div class="row"><div class="grow">启用语音输入</div><button class="sw on"></button></div>
+        <div class="row"><div class="grow">输入法</div><span class="select">Typeless</span></div>
+        <div class="row"><div class="grow"><div>麦克风设备</div><div class="sub">Typeless 里也要选它</div></div><span class="select">yaozhi-mic</span></div>
+        <div class="row"><div class="grow">增益</div><div class="slider"><i style="width:35%"></i><b style="left:35%"></b></div><span class="sub" style="width:44px;text-align:right">+6 dB</span></div>
+        <div class="row"><div class="grow"><div>链路检查</div><div class="sub">BlackHole ✓ · yaozhi-mic ✓ · 辅助功能 ✓</div></div><button class="btn">播放测试音</button></div>
+      </div>`;
+  } else {
+    const g = d.g;
+    const row = (label, v) => `<div class="gest"><span class="sub" style="color:var(--muted)">${label}</span><div class="action">${/^[↑↓←→]$|^Return$|^Esc$|^⌘|^⌥|^⌃/.test(v) ? `<span class="k2">${v}</span>` : v}</div><button class="btn ghost">更改</button></div>`;
+    insp.innerHTML = `
+      <div class="ttl2"><div class="ic gray"><svg><use href="#i-key"/></svg></div><h3>${d.name}</h3><span class="badge m2">M2 开放</span></div>
+      ${d.note ? `<div class="note" style="margin:0 0 12px">${d.note}</div>` : ''}
+      <div class="gtitle">方案（按当前 App 自动切换）</div>
+      <div class="profiles"><span class="pill on">通用</span><span class="pill">Safari</span><span class="pill">访达</span><span class="pill">Keynote</span><span class="pill">＋</span></div>
+      <div class="group" style="padding:2px 12px">${row('单击', g.single)}${row('双击', g.double)}${row('长按', g.long)}</div>
+      ${d.repeat ? `<div class="group"><div class="row"><div class="grow"><div>按住时连续触发</div><div class="sub">每 80 ms 一次，和键盘自动重复一致</div></div><button class="sw on"></button></div></div>` : ''}
+      <div class="group"><div class="row"><div class="grow"><div>录制快捷键</div><div class="sub">直接在键盘上按下想要的组合</div></div><button class="btn">录制</button></div></div>`;
+  }
+  insp.querySelectorAll('.sw').forEach(s => s.addEventListener('click', () => s.classList.toggle('on')));
+}
+bRemote.addEventListener('click', e => { const k = e.target.closest('[data-k]'); if (k) selectKey(k.dataset.k); });
+selectKey('voice');
+
+// mini remotes: click = simulate physical key press
+document.querySelectorAll('[data-remote="bmini"], [data-remote="a"]').forEach(r => r.addEventListener('click', e => {
+  const k = e.target.closest('[data-k]'); if (!k) return;
+  const key = k.dataset.k; flashKey(r, key);
+  const d = KEYS[key];
+  const last = r.closest('.flyout')?.querySelector('[data-lastkey]');
+  if (last) last.textContent = d.fixed ? '最近：语音键（按住才说话）' : `最近：${d.name} → ${d.g.single}`;
+  flashKey(bRemote, key);
+}));
+
+// bars in B flyout
+document.querySelectorAll('[data-bars]').forEach(b => { for (let i=0;i<26;i++) b.appendChild(document.createElement('i')); });
+
+// ---------- talk demo (shared) ----------
+document.querySelectorAll('[data-talk]').forEach(btn => {
+  const fly = btn.closest('[data-flyout]');
+  const sec = btn.closest('.scheme');
+  let timer = null, state = 'idle';
+  const voiceText = fly.querySelector('[data-voice-text]');
+  const idleText = voiceText ? voiceText.textContent : '';
+  const meter = fly.querySelector('[data-meter]');
+  const meterRow = fly.querySelector('[data-meter-row]');
+  const bars = fly.querySelector('[data-bars]');
+  const mini = fly.querySelector('[data-minipipe]');
+  const pipe = sec.querySelector('[data-pipe]');
+  const mb = sec.querySelector('[data-mbicon] use');
+  const voiceKeys = sec.querySelectorAll('[data-k="voice"]');
+  function setLive(on){
+    mini?.querySelectorAll('.ml').forEach(l => l.classList.toggle('live', on));
+    pipe?.querySelectorAll('.link').forEach(l => l.classList.toggle('live', on));
+    pipe?.querySelectorAll('.node').forEach(n => n.classList.toggle('live', on));
+    voiceKeys.forEach(k => k.classList.toggle('voice-live', on));
+    mb?.setAttribute('href', on ? '#i-wave' : '#i-remote');
+  }
+  function tick(){
+    const lvl = 25 + Math.random()*65;
+    if (meter) meter.style.width = lvl + '%';
+    bars?.querySelectorAll('i').forEach(i => i.style.height = (3 + Math.random()*lvl/5) + 'px');
+  }
+  function down(e){
+    e.preventDefault(); if (state !== 'idle') return;
+    state = 'listening'; btn.classList.add('held');
+    if (meterRow) meterRow.style.display = '';
+    if (voiceText) voiceText.textContent = '正在听…（Typeless 已开始）';
+    setLive(true); timer = setInterval(tick, 90); tick();
+  }
+  function up(){
+    if (state !== 'listening') return;
+    state = 'draining'; btn.classList.remove('held'); clearInterval(timer);
+    if (meter) meter.style.width = '8%';
+    bars?.querySelectorAll('i').forEach(i => i.style.height = '3px');
+    if (voiceText) voiceText.textContent = '等声音播完…';
+    setTimeout(() => {
+      setLive(false);
+      if (meter) meter.style.width = '0';
+      if (voiceText) voiceText.textContent = '已交给 Typeless ✓';
+      const s = sec.querySelector('[data-sessions]');
+      if (s){ const t = new Date(); const row = document.createElement('div'); row.className='sess';
+        row.innerHTML = `<span>${t.toTimeString().slice(0,5)}</span><span>演示</span><span class="badge ok">已出字</span>`; s.prepend(row); }
+      const log = sec.querySelector('[data-log]');
+      if (log){ const d = document.createElement('div'); d.className='okc'; d.textContent = new Date().toTimeString().slice(0,8) + ' 播完 91 ms → Fn 点按结束'; log.appendChild(d); log.scrollTop = 1e6; }
+      setTimeout(() => { if (voiceText) voiceText.textContent = idleText; if (meterRow) meterRow.style.display='none'; state = 'idle'; }, 1400);
+    }, 450);
+  }
+  btn.addEventListener('pointerdown', down);
+  ['pointerup','pointerleave','pointercancel'].forEach(ev => btn.addEventListener(ev, up));
+});
+
+// ---------- wizard ----------
+const STEPS = [
+  {t:'欢迎', h:'用遥控器控制你的 Mac', lead:'遥指让蓝牙遥控器成为 Mac 的控制器：按住语音键说话就能打字，之后还能自定义每个按键、切换应用。接下来几步大约 3 分钟。', body:`
+    <div class="illus"><div class="remote" data-remote="w" style="width:90px"></div>
+    <div><div class="check"><div class="ic green"><svg><use href="#i-mic"/></svg></div><div><b>语音输入</b><span class="sub" style="color:var(--muted)">按住说话，松开出字（交给 Typeless 识别）</span></div></div>
+    <div class="check"><div class="ic gray"><svg><use href="#i-key"/></svg></div><div><b>按键控制 <span class="badge m2">即将推出</span></b><span class="sub" style="color:var(--muted)">单击、双击、长按各配一个动作</span></div></div>
+    <div class="check"><div class="ic gray"><svg><use href="#i-shield"/></svg></div><div><b>隐私</b><span class="sub" style="color:var(--muted)">遥指不识别、不保存、不上传语音</span></div></div></div></div>`},
+  {t:'连接遥控器', h:'连接遥控器', lead:'先在系统蓝牙里配对，遥指会自动找到它。', body:`
+    <div class="check"><div class="ic blue"><svg><use href="#i-bt"/></svg></div><div><b>1. 让遥控器进入配对模式</b>同时按住"主页"和"菜单"键，直到指示灯闪烁</div></div>
+    <div class="check"><div class="ic blue"><svg><use href="#i-gear"/></svg></div><div><b>2. 在系统设置里连接</b>"系统设置 → 蓝牙"，点它旁边的"连接"</div><button class="btn" style="margin-left:auto">打开蓝牙设置</button></div>
+    <div class="check"><span class="dot" style="margin-top:6px"></span><div><b>已找到：小米蓝牙遥控器 2 Pro</b>型号 RC003，语音通道正常</div></div>`},
+  {t:'允许蓝牙', h:'允许遥指使用蓝牙', lead:'用来连接遥控器、接收语音。点下面的按钮，系统会弹出授权提示。', body:`
+    <div class="check"><div class="ic blue"><svg><use href="#i-bt"/></svg></div><div><b>蓝牙</b>只连接你配对过的遥控器</div><span class="badge ok" style="margin-left:auto">已允许</span></div>`},
+  {t:'安装 BlackHole', h:'安装虚拟声卡 BlackHole 2ch', lead:'遥指把遥控器的声音送进 BlackHole，输入法再从这里收音。请自己安装原版，遥指不会修改它。', body:`
+    <div class="check"><div class="ic gray"><svg><use href="#i-bh"/></svg></div><div style="flex:1"><b>在终端运行</b><code style="background:var(--chip);padding:2px 6px;border-radius:5px">brew install blackhole-2ch</code>，或到 BlackHole 官网下载安装包</div><button class="btn">复制命令</button></div>
+    <div class="check"><span class="dot" style="margin-top:6px"></span><div><b>已检测到 BlackHole 2ch</b>48 kHz · 2 声道</div></div>`},
+  {t:'准备麦克风', h:'准备麦克风 yaozhi-mic', lead:'Typeless 会隐藏虚拟声卡，所以要用一个"聚集设备"把 BlackHole 包一层，Typeless 才能选到。BlackHole 本身不改。', body:`
+    <div class="seg" id="aggmode" style="margin-bottom:12px"><span class="on" data-m="auto">方式一：遥指自动创建</span><span data-m="manual">方式二：我自己创建</span></div>
+    <div id="agg-auto"><div class="check"><div class="ic green"><svg><use href="#i-check"/></svg></div><div><b>点一下就好</b>遥指会创建一个只包含 BlackHole 2ch 的聚集设备 yaozhi-mic；卸载遥指时一并删除</div><button class="btn primary" style="margin-left:auto">创建</button></div></div>
+    <div id="agg-manual" style="display:none">
+      <div class="check"><div class="ic gray">1</div><div>打开"音频 MIDI 设置"，点左下角"+"→"创建聚集设备"</div><button class="btn" style="margin-left:auto">打开</button></div>
+      <div class="check"><div class="ic gray">2</div><div>右侧只勾选 <b style="display:inline">BlackHole 2ch</b></div></div>
+      <div class="check"><div class="ic gray">3</div><div>把它改名为 <b style="display:inline">yaozhi-mic</b>（名字里不要有 communication）</div></div>
+    </div>
+    <div class="check"><span class="dot" style="margin-top:6px"></span><div><b>已找到 yaozhi-mic</b>包含 BlackHole 2ch</div></div>`},
+  {t:'设置 Typeless', h:'在 Typeless 里选麦克风', lead:'这一步要你在 Typeless 里点一下，遥指读不到它的设置。', body:`
+    <div class="check"><div class="ic gray">1</div><div>打开 Typeless → 设置 → 麦克风，选 <b style="display:inline">yaozhi-mic</b></div><button class="btn" style="margin-left:auto">打开 Typeless</button></div>
+    <div class="check"><div class="ic gray">2</div><div>快捷键保持 <b style="display:inline">Fn</b></div></div>
+    <div class="check"><div class="ic gray">3</div><div>系统设置 → 键盘 → "按下 🌐 键时"设为"不执行任何操作"，避免和系统听写冲突</div><button class="btn" style="margin-left:auto">打开键盘设置</button></div>`},
+  {t:'允许模拟按键', h:'允许遥指模拟按键', lead:'遥指要替你点 Fn 来开始和结束 Typeless。到"辅助功能"里打开遥指。', body:`
+    <div class="check"><div class="ic orange"><svg><use href="#i-shield"/></svg></div><div><b>辅助功能</b>只用来点 Fn、执行你设置的按键动作</div><button class="btn primary" style="margin-left:auto">去授权</button></div>
+    <div class="check"><div class="ic gray"><svg><use href="#i-key"/></svg></div><div><b>输入监控</b>以后读取遥控器按键时才需要，现在可以跳过</div><span class="badge m2" style="margin-left:auto">M2</span></div>`},
+  {t:'试一试', h:'试一试', lead:'把光标放进下面的输入框，按住遥控器语音键说一句话，再松开。', body:`
+    <div class="mini-pipe" data-minipipe style="max-width:420px">
+      <div class="mn"><svg><use href="#i-remote"/></svg></div><div class="ml"></div>
+      <div class="mn"><svg><use href="#i-chip"/></svg></div><div class="ml"></div>
+      <div class="mn"><svg><use href="#i-bh"/></svg></div><div class="ml"></div>
+      <div class="mn"><svg><use href="#i-text"/></svg></div>
+    </div>
+    <div class="bigmeter"><i id="wmeter"></i></div>
+    <div class="result" id="wresult">文字会出现在这里</div>
+    <button class="talk" id="wtalk" style="max-width:420px">按住这里 = 按住遥控器语音键（演示）</button>
+    <div class="hint" style="text-align:left">没出字？向导会按链路逐项告诉你哪一环没通。</div>`},
+];
+let wi = 0;
+function renderWizard(){
+  document.getElementById('wsteps').innerHTML = STEPS.map((s,i) =>
+    `<div class="step ${i<wi?'done':''} ${i===wi?'cur':''}" data-i="${i}"><span class="n">${i<wi?'✓':i+1}</span>${s.t}</div>`).join('');
+  const s = STEPS[wi];
+  document.getElementById('wcontent').innerHTML = `<h2>${s.h}</h2><p class="lead">${s.lead}</p>${s.body}
+    <div class="wfoot"><button class="btn" ${wi===0?'style="visibility:hidden"':''} id="wprev">上一步</button>
+    <span class="sub" style="color:var(--faint)">${wi+1} / ${STEPS.length}</span>
+    <button class="btn primary" id="wnext">${wi===STEPS.length-1?'完成':'继续'}</button></div>`;
+  document.querySelectorAll('#wsteps .step').forEach(el => el.onclick = () => { wi = +el.dataset.i; renderWizard(); });
+  document.getElementById('wprev').onclick = () => { if (wi>0){wi--; renderWizard();} };
+  document.getElementById('wnext').onclick = () => { if (wi<STEPS.length-1){wi++; renderWizard();} };
+  const r = document.querySelector('[data-remote="w"]'); if (r) r.innerHTML = remoteSVG();
+  const seg = document.getElementById('aggmode');
+  if (seg) seg.querySelectorAll('span').forEach(sp => sp.onclick = () => {
+    seg.querySelectorAll('span').forEach(x => x.classList.toggle('on', x===sp));
+    document.getElementById('agg-auto').style.display = sp.dataset.m==='auto'?'':'none';
+    document.getElementById('agg-manual').style.display = sp.dataset.m==='manual'?'':'none';
+  });
+  const wt = document.getElementById('wtalk');
+  if (wt){
+    let tm=null, st='idle'; const m=document.getElementById('wmeter'), res=document.getElementById('wresult');
+    const lines = document.querySelectorAll('#wcontent .ml');
+    wt.onpointerdown = e => { e.preventDefault(); if(st!=='idle')return; st='on'; wt.classList.add('held'); lines.forEach(l=>l.classList.add('live'));
+      res.textContent='正在听…'; tm=setInterval(()=>m.style.width=(25+Math.random()*65)+'%',90); };
+    const up = () => { if(st!=='on')return; st='drain'; clearInterval(tm); wt.classList.remove('held'); m.style.width='6%'; res.textContent='等声音播完…';
+      setTimeout(()=>{ lines.forEach(l=>l.classList.remove('live')); m.style.width='0'; res.style.color='var(--text)';
+        res.textContent='（演示）你好，这是用遥控器说出来的一句话。'; st='idle'; },500); };
+    ['pointerup','pointerleave','pointercancel'].forEach(ev => wt.addEventListener(ev, up));
+  }
+}
+renderWizard();
+</script>
+</body>
+</html>
