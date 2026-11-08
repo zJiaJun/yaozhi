@@ -9,10 +9,7 @@ SDKROOT ?= $(SDK_FALLBACK)
 export SDKROOT
 endif
 
-.PHONY: check fmt vet test yaozhi icon bleprobe inputprobe
-
-BLEPROBE_APP := bin/BLEProbe.app
-INPUTPROBE_APP := bin/InputProbe.app
+.PHONY: check fmt vet test yaozhi icon
 
 check: fmt vet test
 
@@ -36,17 +33,3 @@ yaozhi:
 # App 图标：按 internal/icon 里的 A1 图形重画 resources/icon.png（MyGo 打包时转成 icns）。
 icon:
 	$(GO) run ./cmd/genicon -o resources/icon.png
-
-# T0.2 验证工具。macOS 要求访问蓝牙的进程所属 App 带 NSBluetoothAlwaysUsageDescription，
-# 否则直接杀进程；裸二进制从终端运行时算在终端 App 头上，所以包成 .app 用 open 启动。
-bleprobe:
-	CGO_ENABLED=0 $(GO) build -o $(BLEPROBE_APP)/Contents/MacOS/bleprobe ./cmd/bleprobe
-	cp cmd/bleprobe/Info.plist $(BLEPROBE_APP)/Contents/Info.plist
-	codesign --force --sign - $(BLEPROBE_APP)
-
-# T0.5 验证工具。模拟按键要辅助功能权限，按 App 授权，所以同样包成 .app。
-# 临时签名的授权跟着二进制走：重新编译后要在"辅助功能"里删掉旧条目再授权一次。
-inputprobe:
-	CGO_ENABLED=0 $(GO) build -o $(INPUTPROBE_APP)/Contents/MacOS/inputprobe ./cmd/inputprobe
-	cp cmd/inputprobe/Info.plist $(INPUTPROBE_APP)/Contents/Info.plist
-	codesign --force --sign - $(INPUTPROBE_APP)

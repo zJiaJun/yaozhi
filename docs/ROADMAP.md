@@ -53,6 +53,7 @@
   - 授权引导用 MyGo 的 `plugins/permissionflow`：打开系统设置对应页，下面贴面板把 Yaozhi 拖进列表，面板文字先固定用英文；中文提示和成功反馈由遥指自己的状态岛给出
   - 蓝牙在向导第一步请求，按钮写"继续"；辅助功能在设置语音时请求；输入监控到 M2 设置按键映射时再请求
 - [ ] 日志和诊断（不记录语音内容）
+  - M0 的验证工具 bleprobe、audioprobe、inputprobe 已删除（2026-11-08，主链路都已并入遥指；代码在提交 9c5b252 里）。还没并进来的：读遥控器电量和型号（`cmd/bleprobe/info.go`，做主窗口时并进 `atvvble`）；列出音频设备和聚集设备成员（`audioprobe -list`，放进诊断信息）；监听按键（`inputprobe -watch`，M2 做进按键设置界面，`macinput.WatchKeys` 还在）
 - [ ] 打包签名（先用固定的本机签名身份，避免每次编译都要重新授权；之后 Developer ID 签名和公证）
   - 本机签名已完成（2026-11-08）：`make yaozhi` 在钥匙串里有 `yaozhi-dev` 自签名证书时用它签名（hardened runtime + 时间戳），签名要求为 `identifier "com.github.zjiajun.yaozhi" and certificate leaf = H"…"`。真机记录：授权一次后改代码重新编译三次（代码哈希每次都变），辅助功能和蓝牙都没有失效，hardened runtime 下蓝牙、ATVV、F5 屏蔽正常
   - 待做：Developer ID 签名和公证（发布前）

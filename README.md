@@ -38,7 +38,7 @@ make check
 
 ### 运行遥指
 
-界面用 [MyGo](https://github.com/egoist/mygo) 的原生界面，配置在 `mygo.json`。打包成 `build/darwin-arm64/Yaozhi.app`，再用脚本启动，输出接回当前终端：
+界面用 [MyGo](https://github.com/egoist/mygo) 的原生界面，配置在 `mygo.json`。打包成 `build/darwin-arm64/Yaozhi.app`，再用脚本启动，输出接回当前终端。不能直接运行二进制：macOS 要求访问蓝牙的 App 在 Info.plist 里写明用途，直接运行的二进制算在终端 App 头上，会被直接杀掉（退出码 134，没有输出）。
 
 ```bash
 make yaozhi
@@ -59,57 +59,6 @@ macOS 记住隐私授权时，存的是 App 的签名要求。临时签名（`co
 关掉窗口后遥指留在菜单栏，点图标打开面板，右键是菜单。常用参数加在脚本后面：`-preset <id>` 选输入法预设（默认 `typeless`），`-any` 接受没有设备描述的 ATVV 遥控器。
 
 设计稿在 `docs/design/`，用 `python3 -m http.server -d docs/design` 打开：`main-window.html`（主窗口）、`onboarding.html`（首次设置向导）、`permissions.html`（权限状态）。
-
-### BLE 连通检查（bleprobe）
-
-`cmd/bleprobe` 是 M0 阶段的验证工具：连上遥控器、订阅 ATVV，打印按住语音键时收到的控制事件和音频包。
-
-macOS 要求访问蓝牙的 App 在 Info.plist 里写明 `NSBluetoothAlwaysUsageDescription`，否则会直接杀掉进程（退出码 134，没有任何输出）。直接运行的二进制算在启动它的终端 App 头上，而系统自带的"终端"没有这项说明，所以先打包成 `.app`，再用脚本通过 `open` 启动。脚本会把输出接回当前终端，按 Ctrl-C 时 App 会先关麦、断开连接再退出：
-
-```bash
-make bleprobe
-```
-
-```bash
-scripts/bleprobe.sh
-```
-
-第一次运行会弹出蓝牙授权，点"允许"。常用参数直接加在脚本后面：
-
-- `-info`：不找遥控器，只读出系统里已连接 BLE 设备的型号和电量，用来检查蓝牙绑定本身
-- `-any`：接受任何提供 ATVV 服务的设备，不只认 RC003 的名字
-- `-v`：打印每个音频包的内容
-- `-wav <目录>`：把每段语音解码成 16 kHz WAV，只用于开发时听解码效果
-
-遥控器需要先在"系统设置 → 蓝牙"里配对，并保持连接状态。
-
-### 音频输出检查（audioprobe）
-
-`cmd/audioprobe` 列出音频设备，或往 BlackHole 2ch 播放测试音、16 kHz 单声道 WAV。音频输出不需要隐私权限，直接运行：
-
-```bash
-go run ./cmd/audioprobe -list
-```
-
-```bash
-go run ./cmd/audioprobe -tone 1s
-```
-
-`bleprobe -play` 会把遥控器语音实时播放到 BlackHole，并统计每段的排空时间。用 QuickTime 的"新建音频录制"从 BlackHole 2ch 录音即可听到。
-
-### 按键检查（inputprobe）
-
-`cmd/inputprobe` 用来验证屏蔽 RC003 的 F5、模拟 Fn 点按，并打印系统收到的 F5 和 Fn 事件（其他按键只计数，不打印）。它需要"辅助功能"和"输入监控"权限，所以同样打包成 `.app`：
-
-```bash
-make inputprobe
-```
-
-```bash
-open -W --stdout "$(tty)" --stderr "$(tty)" bin/InputProbe.app --args -watch 20s -block-f5 -tap-fn 10s
-```
-
-临时签名的授权跟着二进制走：重新编译后，要在"辅助功能"和"输入监控"里删掉旧的 InputProbe 再重新授权。
 
 ### 已知环境问题
 
@@ -135,16 +84,12 @@ export SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk
 | `internal/tomlfile` | 严格解析 TOML、按目录加载 |
 | `internal/atvv` | ATVV 协议、IMA ADPCM 解码、会话状态机（纯 Go，可单测） |
 | `internal/corebluetooth` | CoreBluetooth 中心角色的 purego 绑定（不用 cgo） |
-| `cmd/bleprobe` | M0 验证工具：BLE 连通和 ATVV 事件打印 |
-| `scripts/bleprobe.sh` | 以 `.app` 方式启动 bleprobe |
 | `internal/cf` | CoreFoundation 的公共部分（字符串、数字、数组、字典） |
 | `internal/coreaudio` | 按 UID 查找音频设备，用 AudioQueue 播放到指定设备 |
 | `internal/macinput` | 按设备屏蔽按键（UserKeyMapping）、模拟 Fn、监听按键 |
 | `internal/icon` | 画遥指的图形：App 图标和菜单栏图标（A1"墨指"） |
 | `cmd/genicon` | 生成 `resources/icon.png`（`make icon`） |
 | `resources` | 打包用的资源：App 图标 |
-| `cmd/audioprobe` | M0 验证工具：音频设备列表和播放 |
-| `cmd/inputprobe` | M0 验证工具：F5 屏蔽、Fn 点按和按键监听 |
 | `scripts/yaozhi.sh` | 以 `.app` 方式启动遥指 |
 | `docs/design` | 界面设计稿（HTML 原型） |
 
@@ -160,7 +105,7 @@ ATVV 协议处理参考了以下 GPL-3.0 项目：
 
 `internal/macinput` 屏蔽 F5（`UserKeyMapping`，只还原自己改的那一条）和模拟 Fn 点按（键码 63、120 ms）的做法参考了 remote-mic-app 的 `RemoteVoiceFunctionMapper.swift` 和 `KeyboardInjector.swift`。`internal/coreaudio` 的 AudioQueue 用法参考了 [MyGo](https://github.com/egoist/mygo)（MIT）的 `audio/output_darwin.go`。
 
-`cmd/bleprobe` 和 `internal/device/atvvble` 的连接流程（先找系统已连接的设备；订阅 Audio 和 Control 后再请求能力）参考了 open-voice-bridge 的 `XiaomiBluetoothBridge.swift`；RC003 设备描述里的名字、型号和按键 usage 取自 open-voice-bridge 的 `VoiceBridgeDeviceProfile.swift`、`AppSettings.swift` 和 `RemoteButtons.swift`。`internal/voice` 的语音会话流程（先缓存开头、点按后放出、等播完再点按结束）参考了 remote-mic-app 的 `VoiceFnTapSessionController.swift`。
+`internal/device/atvvble` 的连接流程（先找系统已连接的设备；订阅 Audio 和 Control 后再请求能力）参考了 open-voice-bridge 的 `XiaomiBluetoothBridge.swift`；RC003 设备描述里的名字、型号和按键 usage 取自 open-voice-bridge 的 `VoiceBridgeDeviceProfile.swift`、`AppSettings.swift` 和 `RemoteButtons.swift`。`internal/voice` 的语音会话流程（先缓存开头、点按后放出、等播完再点按结束）参考了 remote-mic-app 的 `VoiceFnTapSessionController.swift`。
 
 第三方依赖：[purego](https://github.com/ebitengine/purego)（Apache-2.0）、[MyGo](https://github.com/egoist/mygo)（MIT，其权限引导插件参照 [PermissionFlow](https://github.com/jaywcjlove/PermissionFlow)，MIT）、[BurntSushi/toml](https://github.com/BurntSushi/toml)（MIT）。
 

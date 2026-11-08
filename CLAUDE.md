@@ -41,7 +41,7 @@
 - Go 版本固定在 `.go-version`（1.27.3，用 goenv 管理）。
 - 提交前跑 `make check`（gofmt 检查、`go vet`、`go test -race`）。
 - 协议和解码这类纯逻辑放在不依赖系统框架的包里并写单测；测试数据尽量取自参考项目的测试，并在注释里写明出处。
-- 访问蓝牙等隐私接口的程序必须以带用途说明的 `.app` 运行（见 `make bleprobe`），从 Claude Code 或终端直接跑二进制会被 TCC 杀掉（退出码 134，无输出）。模拟按键、监听按键要"辅助功能""输入监控"权限（见 `make inputprobe`），`make yaozhi` 用本机的 `yaozhi-dev` 证书签名，重新编译不用重新授权；probe 工具仍是临时签名，每次重新编译都要用户重新授权。
+- 访问蓝牙等隐私接口的程序必须以带用途说明的 `.app` 运行（`make yaozhi` 打包、`scripts/yaozhi.sh` 启动），从 Claude Code 或终端直接跑二进制会被 TCC 杀掉（退出码 134，无输出）。模拟按键要"辅助功能"权限，监听按键要"输入监控"权限。`make yaozhi` 用本机的 `yaozhi-dev` 证书签名，重新编译不用重新授权；没有证书时退回临时签名，每次重新编译都要用户重新授权。
 - 按键监听只输出要测的键，不打印用户的其他按键。
 - cgo 链接系统框架报 `unknown architecture` 时，先看 README 的"已知环境问题"。
 
