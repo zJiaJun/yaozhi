@@ -45,7 +45,7 @@
   - 已完成（`internal/voice`）：输入法预设（TOML，内置 `presets/typeless.toml`）、会话逻辑（开头缓存、语音不足 150 ms 当误触、最后一帧淡出、连按排队、断线照样结束）、VirtualMic（点按式和按住式）；`cmd/yaozhi` 接好了 F5 屏蔽（每次重连重新屏蔽）和辅助功能权限检测
   - 真机记录（2026-11-07，`make yaozhi`）：遥指单独运行，按住说话、松开在备忘录出字；按下约 430 ms 后 Typeless 开始，缓存的约 260 ms 开头语音全部补上；松键约 430 ms 后 Typeless 结束（等剩余语音播完约 310 ms + 点按 120 ms）；228 ms 的短按按误触忽略
   - 待做：电源键映射为 F20；断线中断和授权后不重启即可模拟按键这两项还没在真机上验证；结尾等待能否缩短
-- [x] App 图标和菜单栏图标：定稿 A1"墨指"黑白原稿（2026-11-08 用户决定；比较过的配色和头尾互换方案见 `docs/design/icons-a1.html`、`icons-a1-swap.html`）。`internal/icon` 用有向距离场按设计稿的几何画图，`make icon` 生成 `resources/icon.png`，MyGo 打包成 icns；菜单栏用同一图形的模板图，需要处理时右下角加橙点或红点。macOS 26 能识别成标准圆角方形，不会套灰底
+- [x] App 图标和菜单栏图标：定稿 A1"墨指"黑白原稿（2026-11-08 用户决定；比较过的配色和头尾互换方案在提交 79cb87e 的 `docs/design/icons-a1.html`、`icons-a1-swap.html`）。`internal/icon` 用有向距离场按设计稿的几何画图，`make icon` 生成 `resources/icon.png`，MyGo 打包成 icns；菜单栏用同一图形的模板图，需要处理时右下角加橙点或红点。macOS 26 能识别成标准圆角方形，不会套灰底
   - 待做：装 Xcode 26 后用 Icon Composer 做分层的 `.icon`（`mygo.json` 的 `macos.icon`），支持深色、着色和透明模式；菜单栏"正在听"和"已暂停"两种状态等菜单栏界面开发时一起做
 - [ ] 菜单栏和设置窗口
 - [ ] 首次设置向导和权限检测
