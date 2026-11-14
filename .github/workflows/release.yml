@@ -74,6 +74,6 @@ jobs:
             prerelease=""
             case "$GITHUB_REF_NAME" in *-*) prerelease="--prerelease" ;; esac
             gh release create "$GITHUB_REF_NAME" "$dmg" SHA256SUMS.txt \
-              --draft --verify-tag $prerelease --title "遥指 $GITHUB_REF_NAME" \
+              --draft --verify-tag $prerelease --title "yaozhi $GITHUB_REF_NAME" \
               --notes-file "$GITHUB_WORKSPACE/.github/release-notes.md" --generate-notes
           fi

@@ -90,10 +90,10 @@ Release 里的 App 用自签名证书 `Yaozhi Release` 签名，证书和私钥�
 只需要做一次：
 
 ```bash
-scripts/release-cert.sh ~/yaozhi-release-cert
+scripts/release-cert.sh release-cert
 ```
 
-脚本生成 `yaozhi-release.p12` 和它的密码，并打印存进 Secrets 的两条 `gh secret set` 命令（`MACOS_CERTIFICATE`、`MACOS_CERTIFICATE_PASSWORD`）。存好后把这个目录放进密码管理器备份，再删掉本地文件。`*.p12` 已在 `.gitignore` 里。
+脚本在仓库根目录的 `release-cert/` 里生成 `yaozhi-release.p12` 和它的密码 `password.txt`，并打印存进 Secrets 的两条 `gh secret set` 命令（`MACOS_CERTIFICATE`、`MACOS_CERTIFICATE_PASSWORD`）。`release-cert/` 和 `*.p12` 都在 `.gitignore` 里，只留在本地；另外在密码管理器里也存一份，本地文件丢了还能找回。
 
 自签名证书没有经过 Apple 公证，用户第一次打开时 Gatekeeper 会拦，要在"系统设置 → 隐私与安全性"里点"仍要打开"。以后加入 Apple 开发者计划后，换成 Developer ID 证书，在 `mygo.json` 里加 `macos.notarize`，workflow 再导入公证凭据即可（见 MyGo 文档 `docs/github-actions.md`）。注意换证书同样会让用户重新授权一次。
 

@@ -6,7 +6,8 @@
 #   scripts/release-cert.sh <输出目录>
 #
 # 输出目录里会有 yaozhi-release.p12（证书和私钥）和它的密码 password.txt。
-# 按脚本最后打印的命令存进仓库的 Secrets，然后删掉这个目录，或把它放进密码管理器。
+# 按脚本最后打印的命令存进仓库的 Secrets。仓库根目录的 release-cert/ 已被 git 忽略，可以放在那里；
+# 另在密码管理器里存一份。
 #
 # 用户授权时，macOS 记住的是"bundle ID + 这张证书"，所以只要一直用同一张证书签名，
 # 用户升级遥指后蓝牙和辅助功能不用重新授权。证书丢了或换了，所有用户都要重新授权一次。
@@ -45,5 +46,5 @@ cat <<EOF
   base64 -i "$out/yaozhi-release.p12" | gh secret set MACOS_CERTIFICATE
   gh secret set MACOS_CERTIFICATE_PASSWORD < "$out/password.txt"
 
-存好后把这个目录放进密码管理器备份，再删掉本地文件。
+存好后在密码管理器里再存一份，这张证书丢了，所有用户都要重新授权。
 EOF

@@ -6,3 +6,4 @@
 /.mygo/
 /.claude/
 *.p12
+/release-cert/
