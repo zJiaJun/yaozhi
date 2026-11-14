@@ -1,46 +1,98 @@
+<div align="center">
+
+<img src="resources/icon.png" width="112" alt="遥指的图标">
+
 # 遥指 Yaozhi
 
-用遥控器指挥你的 Mac。
+**用遥控器指挥你的 Mac。**
 
-遥指把蓝牙遥控器变成 Mac 的控制器：自定义按键、切换应用，并支持按住遥控器说话、由输入法转成文字。第一款支持的设备是**小米蓝牙遥控器 2 Pro（RC003）**，之后会接入更多设备。
+按住遥控器的语音键说话，松开，文字就出现在光标处。
 
-> 当前状态：**M0 已完成，正在做 M1**。已经能按住遥控器说话、松开出字，界面还在完善。路线图见 [docs/ROADMAP.md](docs/ROADMAP.md)，M0 的技术选型见 [docs/TECH_CHOICES.md](docs/TECH_CHOICES.md)。
+[![CI](https://github.com/zJiaJun/yaozhi/actions/workflows/ci.yml/badge.svg)](https://github.com/zJiaJun/yaozhi/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/zJiaJun/yaozhi?include_prereleases)](https://github.com/zJiaJun/yaozhi/releases)
+[![License: GPL-3.0-only](https://img.shields.io/badge/license-GPL--3.0--only-blue.svg)](LICENSE)
+![Platform](https://img.shields.io/badge/platform-macOS%2013%2B%20·%20Apple%20Silicon-lightgrey.svg)
+![Go](https://img.shields.io/badge/Go-1.27-00ADD8.svg)
 
-## 语音输入原理
+</div>
 
-遥指不做语音识别，只负责把遥控器变成一支"麦克风"：
+![遥指的概览页](docs/screenshots/overview.png)
 
-1. **声音**：遥控器经 BLE 的 ATVV 协议（Android TV 语音协议）发送 ADPCM 音频，遥指把它解码成 16 kHz 单声道，写入虚拟声卡 BlackHole 2ch。输入法通过一个包含 BlackHole 2ch 的聚集设备收音（见下文）。
-2. **开始和结束**：Typeless 只认"点一下开始、再点一下结束"，遥控器只能"按住说话"。遥指在按下时模拟一次 Fn 点按，松开并等音频播放完后再模拟一次。
+遥指把蓝牙遥控器变成 Mac 的控制器。第一项功能是**语音输入**：遥控器当麦克风，交给你已经在用的语音输入法转成文字。之后会加上自定义按键、切换应用，并支持更多遥控器。
 
-遥指不修改系统默认的输入/输出设备，也不保存或上传任何音频。
+> [!NOTE]
+> 遥指还在开发早期（[M1](docs/ROADMAP.md#m1-语音输入)）。语音输入已经能在真机上用，界面和功能还会调整。
 
-## 使用前需要自己准备
+## 特性
 
-- macOS（Apple Silicon）
-- [BlackHole 2ch](https://github.com/ExistentialAudio/BlackHole)：**需要你自己单独安装**，遥指不打包、不修改它，例如 `brew install blackhole-2ch`。请选 2ch 版本，并且只给遥指用：BlackHole 是回环设备，任何 App 播放到它里面的声音都会被输入法一起听到。如果还要录制系统声音，另装 16ch 给录屏用
-- 聚集设备：Typeless 会把虚拟声卡从麦克风列表里去掉，所以要用"音频 MIDI 设置"包一层：点左下角"+"→"创建聚集设备"，只勾选 BlackHole 2ch，改名为 `yaozhi-mic`（名字里不要有 "communication"）。BlackHole 本身不用改
-- Typeless（例如 `brew install --cask typeless`）：在它的设置里把麦克风选为 `yaozhi-mic`，触发键保持 Fn
-- 系统设置 → 键盘 → "按下 🌐 键时" 设为"不执行任何操作"
+- **按住说话**：按下语音键开始，松开结束。开头的声音先缓存，等输入法准备好再送过去；结尾等声音全部送完才结束，不丢字。
+- **不识别、不存音频**：遥指只传递声音，由你选的输入法识别。音频不落盘、不上传，日志里也不记录说了什么。
+- **不改你的系统**：不修改系统默认的输入和输出设备，不改虚拟声卡；只屏蔽这一个遥控器的语音键，其他键和其他键盘不受影响。
+- **引导到出字为止**：首次打开时，概览页就是五步清单，缺什么补什么，最后在遥指自己的输入框里说一句，看到文字才算完成。
+- **菜单栏常驻**：关掉窗口后留在菜单栏，可以随时暂停，暂停时语音键交还给系统。
+- **纯 Go**：界面用 [MyGo](https://github.com/egoist/mygo) 原生绘制，系统接口通过 [purego](https://github.com/ebitengine/purego) 调用，不用 cgo，打包后约 10 MB。
 
-## 开发
+<table>
+  <tr>
+    <td><img src="docs/screenshots/setup.png" alt="首次打开时的五步引导"></td>
+    <td><img src="docs/screenshots/overview-dark.png" alt="深色外观"></td>
+  </tr>
+  <tr>
+    <td align="center">首次打开：五步引导</td>
+    <td align="center">深色外观</td>
+  </tr>
+</table>
 
-需要 Go 1.27.3（版本已写在 `.go-version`，用 goenv 时会自动切换）。
+## 支持的设备和输入法
 
-```bash
-goenv install 1.27.3
-make check
+| 类型 | 已支持 | 计划 |
+|---|---|---|
+| 遥控器 | 小米蓝牙遥控器 2 Pro（RC003） | 其他走 ATVV 协议的语音遥控器 |
+| 语音输入法 | [Typeless](https://www.typeless.com) | Handy 等"虚拟麦克风 + 快捷键"类的输入法 |
+
+设备和输入法的差异写在 TOML 文件里（[`xiaomi-rc003.toml`](internal/device/devices/xiaomi-rc003.toml)、[`typeless.toml`](internal/voice/presets/typeless.toml)），同类的新设备和输入法不用改代码。
+
+## 工作原理
+
+```
+遥控器 ──BLE·ATVV──▶ 遥指 ──16 kHz PCM──▶ BlackHole 2ch ──▶ yaozhi-mic ──▶ Typeless ──▶ 光标处的文字
+                      │                                                       ▲
+                      └──────────────────── 模拟 Fn 点按（开始 / 结束） ──────┘
 ```
 
-`make check` 依次运行 gofmt 检查、`go vet` 和 `go test -race`。
+1. **声音**：遥控器通过 BLE 上的 ATVV 协议（Android TV 语音协议）发送 IMA ADPCM 音频。遥指解码成 16 kHz 单声道，写入虚拟声卡 [BlackHole 2ch](https://github.com/ExistentialAudio/BlackHole)。
+2. **麦克风**：Typeless 的麦克风列表会去掉名字带 "(Virtual)" 的设备，看不到 BlackHole。遥指自动创建一个只包含 BlackHole 2ch 的聚集设备 `yaozhi-mic`，在 Typeless 里选它即可。
+3. **开始和结束**：Typeless 用"点一下 Fn 开始、再点一下结束"，遥控器是按住说话。遥指屏蔽遥控器语音键原本发出的 F5，按下时模拟一次 Fn，松开并等声音送完后再模拟一次。
 
-调用 macOS 原生接口时**不用 cgo**，统一通过 [purego](https://github.com/ebitengine/purego)，和 MyGo 的做法一致，`CGO_ENABLED=0` 就能编译。
+## 安装
 
-### 运行遥指
+### 准备
 
-界面用 [MyGo](https://github.com/egoist/mygo) 的原生界面，配置在 `mygo.json`。打包成 `build/darwin-arm64/Yaozhi.app`，再用脚本启动，输出接回当前终端。不能直接运行二进制：macOS 要求访问蓝牙的 App 在 Info.plist 里写明用途，直接运行的二进制算在终端 App 头上，会被直接杀掉（退出码 134，没有输出）。
+- 一台 Apple Silicon 的 Mac，macOS 13 或更新（目前在 macOS 26 上测试）
+- 已经和 Mac 配对的小米蓝牙遥控器 2 Pro
+- [BlackHole 2ch](https://github.com/ExistentialAudio/BlackHole) 和 [Typeless](https://www.typeless.com)：
+
+  ```bash
+  brew install blackhole-2ch typeless
+  ```
+
+  遥指不打包、不修改 BlackHole。请只把 2ch 版本留给遥指：BlackHole 是回环设备，任何 App 播放到里面的声音都会被输入法一起听到。如果还要录系统声音，另装 16ch 给录屏用。
+
+### 下载
+
+1. 在 [Releases](https://github.com/zJiaJun/yaozhi/releases) 下载最新的 `yaozhi-<版本>-arm64.dmg`，打开后把 Yaozhi 拖进"应用程序"。
+2. 第一次打开时 macOS 会提示无法验证开发者。点"完成"，然后打开"系统设置 → 隐私与安全性"，在页面底部点"仍要打开"。
+
+> [!NOTE]
+> 遥指目前用自签名证书签名，还没有经过 Apple 公证，所以第一次打开需要手动放行。之后的版本都用同一张证书签名，升级时直接替换即可，蓝牙和辅助功能的授权会保留。
+
+### 从源码编译
+
+需要 Go 1.27.3（版本写在 [`.go-version`](.go-version)，用 goenv 时会自动切换）。
 
 ```bash
+git clone https://github.com/zJiaJun/yaozhi.git
+cd yaozhi
 make yaozhi
 ```
 
@@ -48,54 +100,81 @@ make yaozhi
 scripts/yaozhi.sh
 ```
 
-第一次运行会弹出蓝牙授权。辅助功能在窗口"准备情况"里点"去授权"：系统设置会打开，把下面面板里的 Yaozhi 拖进列表即可，不用重启。
+`make yaozhi` 打包出 `build/darwin-arm64/Yaozhi.app`，`scripts/yaozhi.sh` 启动它并把日志接到当前终端；`make dmg` 另外打出磁盘映像。
 
-#### 签名
+> [!IMPORTANT]
+> 不能直接运行编译出来的二进制。macOS 要求访问蓝牙的程序在 `Info.plist` 里写明用途，直接运行会被系统杀掉（退出码 134，没有输出）。
 
-macOS 记住隐私授权时，存的是 App 的签名要求。临时签名（`codesign -s -`）的签名要求就是代码哈希，重新编译后对不上，蓝牙和辅助功能都要重新授权，列表里还会留下失效的旧条目。用证书签名时，签名要求是"bundle ID + 证书"，和代码内容无关，重新编译后授权仍然有效。
+## 使用
 
-开发时建一张本机自签名证书就够了：打开"钥匙串访问"，选"证书助理 → 创建证书"，名称填 `yaozhi-dev`，身份类型选"自签名根证书"，证书类型选"代码签名"。不需要把它设为信任。`make yaozhi` 发现钥匙串里有这张证书就用它签名（带 hardened runtime 和时间戳），没有就退回临时签名；也可以用 `make yaozhi SIGN=<身份>` 指定。从临时签名换成证书签名后要最后授权一次，并删掉列表里旧的 Yaozhi。这张证书只在本机有效，发给别人用要 Developer ID 签名并公证。
+第一次打开时，概览页会列出还差的几步，按顺序做完即可：
 
-关掉窗口后遥指留在菜单栏，点图标打开面板，右键是菜单。常用参数加在脚本后面：`-preset <id>` 选输入法预设（默认 `typeless`），`-any` 接受没有设备描述的 ATVV 遥控器。
+1. **连接遥控器**：点"继续"后系统会询问蓝牙权限。还没配对的话，同时长按遥控器的主页键和菜单键进入配对。
+2. **安装 BlackHole 2ch**：装好后遥指自己发现，并创建 `yaozhi-mic`。
+3. **安装 Typeless**：装好并打开它。
+4. **允许辅助功能**：遥指只用它来模拟 Fn 点按。点"去授权"，把 Yaozhi 拖进系统设置里的列表。
+5. **选麦克风，说一句**：在 Typeless 的"选择麦克风"里选 `yaozhi-mic`，然后按住语音键说一句，文字出现在遥指的输入框里就完成了。
 
-设计稿在 `docs/design/`，用 `python3 -m http.server -d docs/design` 打开：`main-window.html`（主窗口）、`onboarding.html`（首次设置向导）、`permissions.html`（权限状态）。
+之后在任何输入框里，按住语音键说话、松开，文字就出现在光标处。
 
-### 已知环境问题
+> [!TIP]
+> 如果按 Fn 会弹出表情或听写，把"系统设置 → 键盘 → 按下 🌐 键时"改为"不执行任何操作"。
 
-目前的代码不用 cgo，不受下面这个问题影响；以后引入需要 cgo 的依赖时才会遇到。
+### 常见问题
 
-如果 Command Line Tools 的链接器比默认 SDK 旧（例如 ld 26.6 搭配 MacOSX27 SDK），cgo 链接系统框架时会报 `unknown architecture`。常见原因是一次更新里先后装了新旧两版 Command Line Tools，旧版覆盖了链接器，新版 SDK 却留了下来；`xcrun --show-sdk-version` 会显示比工具链新的版本。删掉多出来的 SDK，或安装与它配套的 Command Line Tools 即可。
+<details>
+<summary>按住说话没反应</summary>
 
-在修好之前，`Makefile` 会自动改用 `MacOSX26.5.sdk`；直接运行 `go` 命令时需要自己设置：
+看菜单栏图标右下角有没有提醒点，有的话打开主窗口按提示补齐缺少的一步。语音输入被暂停时，语音键会交还给系统，在菜单栏选"启用语音输入"即可。
+</details>
+
+<details>
+<summary>Typeless 开始听写了，但没有文字</summary>
+
+确认 Typeless 的"选择麦克风"选的是 `yaozhi-mic`，而不是"系统默认"或其他设备。声音太小时，可以在"语音"页调高音量增益。
+</details>
+
+<details>
+<summary>每次重新编译都要重新授权</summary>
+
+这是临时签名的限制。照 [开发文档](docs/DEVELOPMENT.md#签名) 建一张本机自签名证书 `yaozhi-dev`，之后重新编译不用再授权。
+</details>
+
+<details>
+<summary>需要提交问题时附上什么</summary>
+
+在"设备"页点"导出诊断"，会生成一份包含版本、系统、状态、音频设备和最近日志的文本文件（不含语音内容），附在 issue 里即可。
+</details>
+
+## 隐私
+
+- 遥指不做语音识别，音频只在内存里经过，不保存、不上传。
+- 日志和导出的诊断不包含语音内容；"试一试"输入框里的文字只在内存里。
+- `~/Library/Application Support/Yaozhi/` 下只存设置和使用次数（`settings.json`、`stats.json`）。
+- 遥指不联网。
+
+## 路线图
+
+- **M0 技术验证** ✅：Go 能打通蓝牙、解码、虚拟声卡和模拟按键，见 [技术选型](docs/TECH_CHOICES.md)。
+- **M1 语音输入** 🚧：按住说话、首次引导、菜单栏、签名发布。
+- **M2 控制 Mac**：自定义按键、单击/双击/长按、切换应用、按当前 App 切换键位。
+- **M3 更多设备**：第二款 ATVV 遥控器、设备选择。
+
+详见 [ROADMAP](docs/ROADMAP.md)。
+
+## 参与开发
 
 ```bash
-export SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX26.5.sdk
+make check   # gofmt 检查、go vet、go test -race
 ```
 
-## 目录
+编译运行、签名、调试参数、项目结构和设计稿见 [开发文档](docs/DEVELOPMENT.md)。界面设计稿在 [`docs/design/index.html`](docs/design/index.html)。
 
-| 路径 | 内容 |
-|---|---|
-| `cmd/yaozhi` | 遥指本体：MyGo 菜单栏图标、面板和主窗口 |
-| `internal/app` | 不含界面的部分：设备、语音会话、屏蔽语音键、权限和设备检查，给界面一份状态 |
-| `internal/device` | 设备层：统一事件、`Device` 接口、TOML 设备描述（内置 `devices/xiaomi-rc003.toml`） |
-| `internal/device/atvvble` | 蓝牙 + ATVV 的设备适配器，断线自动重连 |
-| `internal/voice` | 输入法层：语音会话（开头缓存、误触、淡出、连按排队）、TOML 输入法预设（内置 `presets/typeless.toml`）、虚拟麦克风 + 快捷键的通用实现 |
-| `internal/tomlfile` | 严格解析 TOML、按目录加载 |
-| `internal/atvv` | ATVV 协议、IMA ADPCM 解码、会话状态机（纯 Go，可单测） |
-| `internal/corebluetooth` | CoreBluetooth 中心角色的 purego 绑定（不用 cgo） |
-| `internal/cf` | CoreFoundation 的公共部分（字符串、数字、数组、字典） |
-| `internal/coreaudio` | 按 UID 查找音频设备，用 AudioQueue 播放到指定设备 |
-| `internal/macinput` | 按设备屏蔽按键（UserKeyMapping）、模拟 Fn、监听按键 |
-| `internal/icon` | 画遥指的图形：App 图标和菜单栏图标（A1"墨指"） |
-| `cmd/genicon` | 生成 `resources/icon.png`（`make icon`） |
-| `resources` | 打包用的资源：App 图标 |
-| `scripts/yaozhi.sh` | 以 `.app` 方式启动遥指 |
-| `docs/design` | 界面设计稿（HTML 原型） |
+欢迎提 issue 和 PR。提交前请跑 `make check`；协议和解码这类纯逻辑请附单元测试。
 
 ## 来源与许可
 
-本项目以 **GPL-3.0-only** 发布，见 [LICENSE](LICENSE)。
+遥指以 [GPL-3.0-only](LICENSE) 发布。
 
 ATVV 协议处理参考了以下 GPL-3.0 项目：
 
@@ -103,10 +182,14 @@ ATVV 协议处理参考了以下 GPL-3.0 项目：
 - [remote-mic-app（无线麦 SayAll）](https://github.com/HD838A/remote-mic-app)
 - [remote-bridge-hub](https://github.com/xxb26553663-star/remote-bridge-hub)
 
-`internal/macinput` 屏蔽 F5（`UserKeyMapping`，只还原自己改的那一条）和模拟 Fn 点按（键码 63、120 ms）的做法参考了 remote-mic-app 的 `RemoteVoiceFunctionMapper.swift` 和 `KeyboardInjector.swift`。`internal/coreaudio` 的 AudioQueue 用法参考了 [MyGo](https://github.com/egoist/mygo)（MIT）的 `audio/output_darwin.go`。
+具体对应关系：
 
-`internal/device/atvvble` 的连接流程（先找系统已连接的设备；订阅 Audio 和 Control 后再请求能力）参考了 open-voice-bridge 的 `XiaomiBluetoothBridge.swift`；RC003 设备描述里的名字、型号和按键 usage 取自 open-voice-bridge 的 `VoiceBridgeDeviceProfile.swift`、`AppSettings.swift` 和 `RemoteButtons.swift`。`internal/voice` 的语音会话流程（先缓存开头、点按后放出、等播完再点按结束）参考了 remote-mic-app 的 `VoiceFnTapSessionController.swift`。
+- `internal/atvv` 的 ADPCM 解码以 open-voice-bridge 为准，测试数据取自它。
+- `internal/device/atvvble` 的连接流程（先找系统已连接的设备；订阅 Audio 和 Control 后再请求能力）参考了 open-voice-bridge 的 `XiaomiBluetoothBridge.swift`；RC003 设备描述里的名字、型号和按键 usage 取自它的 `VoiceBridgeDeviceProfile.swift`、`AppSettings.swift` 和 `RemoteButtons.swift`。
+- `internal/macinput` 屏蔽 F5（`UserKeyMapping`，只还原自己改的那一条）和模拟 Fn 点按（键码 63、120 ms）参考了 remote-mic-app 的 `RemoteVoiceFunctionMapper.swift` 和 `KeyboardInjector.swift`。
+- `internal/voice` 的语音会话流程（先缓存开头、点按后放出、等播完再点按结束）参考了 remote-mic-app 的 `VoiceFnTapSessionController.swift`。
+- `internal/coreaudio` 的 AudioQueue 用法参考了 [MyGo](https://github.com/egoist/mygo)（MIT）的 `audio/output_darwin.go`。
 
 第三方依赖：[purego](https://github.com/ebitengine/purego)（Apache-2.0）、[MyGo](https://github.com/egoist/mygo)（MIT，其权限引导插件参照 [PermissionFlow](https://github.com/jaywcjlove/PermissionFlow)，MIT）、[BurntSushi/toml](https://github.com/BurntSushi/toml)（MIT）。
 
-BlackHole 由用户自行安装，不随本项目分发。"小米"和"Xiaomi"是其权利人的商标，本项目与小米无关。
+界面里的遥控器是自己画的矢量线稿，不含实物照片。BlackHole 由用户自行安装，不随本项目分发。"小米"和"Xiaomi"是其权利人的商标，本项目与小米无关。

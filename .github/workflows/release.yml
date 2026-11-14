@@ -1,0 +1,79 @@
+# 推送 v* 标签时打包 dmg，上传到同名的草稿 Release，检查后在网页上点发布。
+# 签名用自签名证书 "Yaozhi Release"（scripts/release-cert.sh 生成，存在 Secrets 里），
+# 用户升级后蓝牙和辅助功能的授权不会失效。没有公证，第一次打开要在"隐私与安全性"里放行。
+# 详见 docs/DEVELOPMENT.md"发布"。
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write # 创建 Release、上传文件
+
+jobs:
+  release:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: .go-version
+
+      - name: 核对标签和 mygo.json 的版本
+        run: |
+          want="v$(jq -r .version mygo.json)"
+          if [ "$GITHUB_REF_NAME" != "$want" ]; then
+            echo "::error::标签 $GITHUB_REF_NAME 和 mygo.json 的版本 $want 不一致"
+            exit 1
+          fi
+
+      - run: make check
+
+      - name: 导入签名证书
+        env:
+          MACOS_CERTIFICATE: ${{ secrets.MACOS_CERTIFICATE }}
+          MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          if [ -z "$MACOS_CERTIFICATE" ]; then
+            echo "::error::缺少 Secrets MACOS_CERTIFICATE，先运行 scripts/release-cert.sh"
+            exit 1
+          fi
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          password="$(openssl rand -base64 24)"
+          security create-keychain -p "$password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$password" "$keychain"
+          echo "$MACOS_CERTIFICATE" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security import "$RUNNER_TEMP/certificate.p12" -k "$keychain" \
+            -P "$MACOS_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          rm "$RUNNER_TEMP/certificate.p12"
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$password" "$keychain" > /dev/null
+          security list-keychains -d user -s "$keychain" login.keychain
+          security find-identity -p codesigning "$keychain" | grep -q '"Yaozhi Release"'
+
+      - name: 打包
+        run: make dmg SIGN="Yaozhi Release"
+
+      - name: 检查签名
+        run: |
+          app=build/darwin-arm64/Yaozhi.app
+          codesign --verify --deep --strict "$app"
+          codesign -d -r- "$app" 2>&1 | grep -q 'certificate leaf'
+
+      - name: 上传到草稿 Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd build/darwin-arm64
+          dmg="$(ls yaozhi-*-arm64.dmg)"
+          shasum -a 256 "$dmg" > SHA256SUMS.txt
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "$dmg" SHA256SUMS.txt --clobber
+          else
+            prerelease=""
+            case "$GITHUB_REF_NAME" in *-*) prerelease="--prerelease" ;; esac
+            gh release create "$GITHUB_REF_NAME" "$dmg" SHA256SUMS.txt \
+              --draft --verify-tag $prerelease --title "遥指 $GITHUB_REF_NAME" \
+              --notes-file "$GITHUB_WORKSPACE/.github/release-notes.md" --generate-notes
+          fi
