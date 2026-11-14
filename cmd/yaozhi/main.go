@@ -2,10 +2,10 @@
 
 //go:build darwin
 
-// Command yaozhi is the Yaozhi app: a menu bar icon with a panel, and a main
+// Command yaozhi is the Yaozhi app: a menu bar icon with its menu, and a main
 // window, in MyGo's native UI. The engine (internal/app) does the work; this
-// file only shows its state. The look follows docs/design/main-window.html,
-// which later steps bring the window closer to.
+// command only shows its state. The look, the five-step setup and the
+// readiness list follow docs/design/index.html ("墨与朱").
 //
 // Build and run it as an app bundle (make yaozhi, then scripts/yaozhi.sh):
 // macOS kills a process that touches Bluetooth without the usage string the
@@ -18,8 +18,11 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/egoist/mygo"
@@ -28,13 +31,28 @@ import (
 
 	"github.com/zJiaJun/yaozhi/internal/app"
 	"github.com/zJiaJun/yaozhi/internal/device"
+	"github.com/zJiaJun/yaozhi/internal/icon"
 	"github.com/zJiaJun/yaozhi/internal/voice"
 )
 
 var start = time.Now()
 
+// recent keeps the latest log lines for a diagnostics report. Like the
+// log itself, they never hold audio or text.
+var recent struct {
+	sync.Mutex
+	lines []string
+}
+
 func logf(format string, args ...any) {
-	fmt.Printf("[%7.3f] %s\n", time.Since(start).Seconds(), fmt.Sprintf(format, args...))
+	line := fmt.Sprintf("[%7.3f] %s", time.Since(start).Seconds(), fmt.Sprintf(format, args...))
+	fmt.Println(line)
+	recent.Lock()
+	recent.lines = append(recent.lines, line)
+	if n := len(recent.lines) - 300; n > 0 {
+		recent.lines = recent.lines[n:]
+	}
+	recent.Unlock()
 }
 
 // supportDir is where user files live.
@@ -49,6 +67,7 @@ func supportDir() string {
 func main() {
 	presetID := flag.String("preset", "typeless", "输入法预设")
 	anyRemote := flag.Bool("any", false, "也接受没有设备描述的 ATVV 遥控器（试用新设备）")
+	pretend := flag.String("pretend", "", "假装缺少一些东西，用来看首次启动的引导：all，或用逗号隔开的 bluetooth、remote、blackhole、typeless、typeless-off、ax、text")
 	flag.Parse()
 
 	descs, err := device.Catalog(filepath.Join(supportDir(), "devices"))
@@ -64,8 +83,12 @@ func main() {
 		log.Fatalf("没有输入法预设 %q", *presetID)
 	}
 
-	eng := app.New(app.Options{Devices: descs, Preset: presets[i], AcceptAny: *anyRemote, Logf: logf})
-	s := &shell{eng: eng}
+	eng := app.New(app.Options{
+		Devices: descs, Preset: presets[i], AcceptAny: *anyRemote, Logf: logf,
+		StatsFile:    filepath.Join(supportDir(), "stats.json"),
+		SettingsFile: filepath.Join(supportDir(), "settings.json"),
+	})
+	s := &shell{eng: eng, preset: presets[i], launched: time.Now(), page: pageOverview, selKey: "voice", pretend: parsePretend(*pretend)}
 	eng.OnChange(s.changed)
 
 	mygo.App.SetName("Yaozhi")
@@ -82,13 +105,37 @@ func main() {
 // changed, which the engine calls from its goroutines.
 type shell struct {
 	eng      *app.Engine
+	preset   voice.Preset
 	st       app.State
 	win      *mygo.Window
-	panel    *mygo.Window // the open menu bar panel, or nil
 	tray     *mygo.Tray
-	trayTone string
+	trayLook string
+	trayMenu string // what the menu bar menu says, to set it again only when that changes
 	quitting bool
 	guiding  bool
+	launched time.Time
+
+	page      string // the main window's page
+	selKey    string // the key picked out on the "按键" page
+	readyOpen bool   // the readiness list, opened from its chip
+
+	flash      string // a moment's news on the status bar
+	flashUntil time.Time
+
+	try tryBox // the overview's box to try voice input in
+
+	// finished: the last step of the first launch was done in this run,
+	// and the overview still shows the steps, all ticked, until the user
+	// moves on.
+	finished bool
+
+	pretend map[string]bool // what is shown as missing, see pretend.go
+
+	// The overview's level bars while listening: the latest levels, the
+	// newest first.
+	wave   [30]float32
+	waveAt time.Time
+	level  float32
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -96,6 +143,7 @@ type shell struct {
 }
 
 func (s *shell) ready() {
+	logf("遥指 %s", versionLine())
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 	s.done = make(chan struct{})
 	go func() {
@@ -106,37 +154,18 @@ func (s *shell) ready() {
 	}()
 
 	var err error
-	s.tray, err = mygo.NewTray(mygo.TrayOptions{Icon: trayIcon("", false), IconIsTemplate: true, ToolTip: "遥指"})
+	s.tray, err = mygo.NewTray(mygo.TrayOptions{Icon: trayIcon(icon.GlyphIdle, "", false), IconIsTemplate: true, ToolTip: "遥指"})
 	if err != nil {
 		log.Fatal("tray: ", err)
 	}
-	s.tray.OnClick(s.togglePanel)
-	s.tray.OnRightClick(func() {
-		if s.panel != nil {
-			s.panel.Close()
-		}
-		s.tray.SetMenu(mygo.NewMenu([]*mygo.MenuItem{
-			{Label: "打开遥指", Click: func(*mygo.MenuItem, *mygo.Window) { s.showWindow() }},
-			mygo.Separator(),
-			{Label: "移除 yaozhi-mic 并退出", Click: func(*mygo.MenuItem, *mygo.Window) {
-				if err := s.eng.RemoveMic(); err != nil {
-					logf("移除 yaozhi-mic 失败：%v", err)
-				}
-				mygo.App.Quit()
-			}},
-			{Label: "退出遥指", Click: func(*mygo.MenuItem, *mygo.Window) { mygo.App.Quit() }},
-		}))
-		defer s.tray.SetMenu(nil)
-		s.tray.PopUpMenu()
-	})
-	s.tray.OnAppearanceChange(func() { s.trayTone = "?"; s.updateTray() })
+	s.tray.OnAppearanceChange(func() { s.trayLook = "?"; s.updateTray() })
 
 	s.win = mygo.NewWindow(mygo.WindowOptions{
 		Title:         "遥指",
-		Width:         920,
-		Height:        600,
-		MinWidth:      780,
-		MinHeight:     520,
+		Width:         1040,
+		Height:        660,
+		MinWidth:      900,
+		MinHeight:     580,
 		TitleBarStyle: mygo.TitleBarHiddenInset,
 		Hidden:        true,
 		Content:       ui.View(s.mainView),
@@ -148,16 +177,43 @@ func (s *shell) ready() {
 			s.hideWindow()
 		}
 	})
-	s.st = s.eng.State()
+	s.st = s.pretended(s.eng.State())
+	s.updateTray()
 	s.showWindow()
 }
 
 // changed is called by the engine from any goroutine.
 func (s *shell) changed() {
-	for _, w := range []*mygo.Window{s.win, s.panel} {
-		if w != nil {
-			w.Update(func() { s.st = s.eng.State(); s.updateTray() })
-		}
+	if s.win != nil {
+		s.win.Update(func() { s.setState(s.eng.State()) })
+	}
+}
+
+// setState takes a new state, saying on the status bar what just became
+// fine.
+func (s *shell) setState(st app.State) {
+	st = s.pretended(st)
+	old := s.st
+	s.st = st
+	s.updateTray()
+	if old == st || time.Since(s.launched) < 3*time.Second {
+		return // the first checks, not news
+	}
+	s.try.follow(s, old, st)
+	o, n := old.Ready, st.Ready
+	switch {
+	case n.Accessibility && !o.Accessibility:
+		s.say("辅助功能已允许，可以说话了")
+	case n.BlackHole && n.Mic && !(o.BlackHole && o.Mic):
+		s.say(app.MicName + " 已就绪")
+	case st.Conn == device.StateReady && old.Conn != device.StateReady && st.Voice == app.VoiceIdle:
+		s.say("遥控器已连接")
+	}
+	if n.Ready() && !o.Ready() {
+		s.readyOpen = false
+	}
+	if st.TextSeen && !old.TextSeen {
+		s.finished = true
 	}
 }
 
@@ -175,9 +231,6 @@ func (s *shell) stop() {
 
 func (s *shell) showWindow() {
 	mygo.App.SetActivationPolicy(mygo.ActivationPolicyRegular)
-	if s.panel != nil {
-		s.panel.Close()
-	}
 	s.win.Show()
 	s.win.Focus()
 }
@@ -185,26 +238,6 @@ func (s *shell) showWindow() {
 func (s *shell) hideWindow() {
 	s.win.Hide()
 	mygo.App.SetActivationPolicy(mygo.ActivationPolicyAccessory)
-}
-
-func (s *shell) togglePanel() {
-	if s.panel != nil {
-		s.panel.Close()
-		return
-	}
-	s.st = s.eng.State()
-	s.panel = mygo.NewFlyout(mygo.FlyoutOptions{
-		Tray:      s.tray,
-		Placement: mygo.PlacementBottom,
-		Gap:       4,
-		Width:     320,
-		Height:    250,
-		Focusable: true,
-		Shadow:    true,
-		Popover:   true,
-		Content:   ui.View(s.panelView),
-	})
-	s.panel.OnClosed(func() { s.panel = nil })
 }
 
 // guide opens System Settings at the permission, with MyGo's panel to drag
@@ -222,300 +255,121 @@ func (s *shell) guide(p permissionflow.Permission) {
 	}()
 }
 
-// ---------------------------------------------------------------- status
+// exportDiagnostics writes what Yaozhi sees and its recent log to a text
+// file, and shows it in the Finder.
+func (s *shell) exportDiagnostics() {
+	go func() {
+		var b strings.Builder
+		fmt.Fprintf(&b, "遥指 Yaozhi %s\n%s\n", versionLine(), time.Now().Format("2006-01-02 15:04:05 -0700"))
+		if v, err := exec.Command("sw_vers", "-productVersion").Output(); err == nil {
+			fmt.Fprintf(&b, "macOS %s", v)
+		}
+		b.WriteString("\n" + s.eng.Diagnostics() + "\n最近的日志：\n")
+		recent.Lock()
+		b.WriteString(strings.Join(recent.lines, "\n"))
+		recent.Unlock()
+		b.WriteString("\n")
 
-// tone is how a status reads at a glance.
-type tone int
-
-const (
-	toneOK tone = iota
-	toneWarn
-	toneBad
-	toneBusy
-	toneVoice
-	toneMuted
-)
-
-func (k tone) color(t *ui.Theme) ui.Color {
-	switch k {
-	case toneWarn:
-		return t.Warning
-	case toneBad:
-		return t.Danger
-	case toneBusy:
-		return t.Accent
-	case toneVoice:
-		return ui.Hex("#ff6b6b")
-	case toneMuted:
-		return t.TextMuted
-	}
-	return t.Success
+		dir := filepath.Join(supportDir(), "diagnostics")
+		path := filepath.Join(dir, "yaozhi-"+time.Now().Format("20060102-150405")+".txt")
+		err := os.MkdirAll(dir, 0o755)
+		if err == nil {
+			err = os.WriteFile(path, []byte(b.String()), 0o644)
+		}
+		msg := "诊断已导出，不含语音和文字"
+		if err != nil {
+			logf("导出诊断失败：%v", err)
+			msg = "导出诊断失败"
+		} else {
+			mygo.Shell.ShowItemInFolder(path)
+		}
+		s.win.Update(func() { s.say(msg) })
+	}()
 }
 
-// status is the one line the island and the panel show.
-type status struct {
-	tone   tone
-	title  string
-	detail string
-	action string // a button, if the user can do something about it
-	do     func()
-}
-
-func (s *shell) status() status {
-	st := s.st
-	r := st.Ready
-	switch st.Voice {
-	case app.VoiceListening:
-		return status{tone: toneVoice, title: "正在听", detail: "松开语音键结束"}
-	case app.VoiceEnding:
-		return status{tone: toneBusy, title: "收尾中…"}
-	case app.VoiceDone:
-		return status{tone: toneOK, title: "已交给 Typeless", detail: fmt.Sprintf("%.1f 秒", st.LastAudio.Seconds())}
-	case app.VoiceFailed:
-		return status{tone: toneBad, title: "这次没有成功", detail: st.Problem}
-	}
-	switch {
-	case r.Bluetooth == app.PermDenied:
-		return status{tone: toneBad, title: "没有蓝牙权限", detail: "连不上遥控器", action: "去系统设置", do: func() { s.guide(permissionflow.Bluetooth) }}
-	case !r.Accessibility:
-		return status{tone: toneWarn, title: fmt.Sprintf("还差 %d 步", app.TotalSteps-r.Steps()), detail: "下一步：允许辅助功能", action: "去授权", do: func() { s.guide(permissionflow.Accessibility) }}
-	case !r.BlackHole:
-		return status{tone: toneWarn, title: fmt.Sprintf("还差 %d 步", app.TotalSteps-r.Steps()), detail: "下一步：安装 BlackHole 2ch"}
-	case !r.Mic && r.MicErr != "":
-		return status{tone: toneWarn, title: "虚拟麦克风没准备好", detail: r.MicErr}
-	case !r.Mic:
-		return status{tone: toneBusy, title: "正在准备虚拟麦克风…"}
-	}
-	switch st.Conn {
-	case device.StateUnavailable:
-		return status{tone: toneBad, title: "蓝牙已关闭"}
-	case device.StateSearching:
-		return status{tone: toneMuted, title: "等待遥控器连接", detail: "按遥控器任意键唤醒"}
-	case device.StateConnecting:
-		return status{tone: toneBusy, title: "正在连接遥控器…"}
-	}
-	return status{tone: toneOK, title: "就绪", detail: "按住语音键说话，松开出字"}
-}
+// ---------------------------------------------------------------- menu bar
 
 func (s *shell) updateTray() {
 	if s.tray == nil {
 		return
 	}
-	tn := ""
-	switch k := s.status().tone; {
-	case k == toneBad:
-		tn = "bad"
-	case k == toneWarn:
-		tn = "warn"
+	x := s.status()
+	state, badge := icon.GlyphIdle, ""
+	switch {
+	case x.tone == toneVoice:
+		state = icon.GlyphLive
+	case x.tone == toneBad:
+		badge = "bad"
+	case x.tone == toneWarn:
+		badge = "warn"
+	case s.st.Paused:
+		state = icon.GlyphPaused
 	}
-	if tn == s.trayTone {
-		return
+	if look := fmt.Sprint(state, badge); look != s.trayLook {
+		s.trayLook = look
+		if badge == "" {
+			_ = s.tray.SetIcon(trayIcon(state, "", false), true)
+		} else {
+			_ = s.tray.SetIcon(trayIcon(state, badge, s.tray.Dark()), false)
+		}
 	}
-	s.trayTone = tn
-	if tn == "" {
-		_ = s.tray.SetIcon(trayIcon("", false), true)
+	// The menu is set anew whenever what it says changes.
+	items := s.menu()
+	var said strings.Builder
+	for _, it := range items {
+		said.WriteString(it.Label + "\n")
+	}
+	if said.String() != s.trayMenu {
+		s.trayMenu = said.String()
+		s.tray.SetMenu(mygo.NewMenu(items))
+	}
+}
+
+// menu is the menu bar icon's menu, the system's own: who is connected,
+// greyed out as something to read, then the few things to do from here.
+func (s *shell) menu() []*mygo.MenuItem {
+	x := s.status()
+	st := s.st
+	info := func(label string) *mygo.MenuItem { return &mygo.MenuItem{Label: label, Disabled: true} }
+	do := func(label string, fn func()) *mygo.MenuItem {
+		return &mygo.MenuItem{Label: label, Click: func(*mygo.MenuItem, *mygo.Window) { fn() }}
+	}
+
+	items := []*mygo.MenuItem{info(s.deviceLine()), mygo.Separator()}
+	if x.action != "" && x.do != nil && !x.resume { // resuming is the next item
+		items = append(items, do(x.action+"…", x.do))
+	}
+	if st.Paused {
+		items = append(items, do("启用语音输入", func() { s.eng.SetPaused(false) }))
 	} else {
-		_ = s.tray.SetIcon(trayIcon(tn, s.tray.Dark()), false)
+		items = append(items, do("暂停语音输入", func() { s.eng.SetPaused(true) }))
 	}
+	return append(items,
+		do("打开遥指…", s.showWindow),
+		do("关于遥指", showAbout),
+		mygo.Separator(),
+		do("退出遥指", mygo.App.Quit),
+	)
 }
 
-// ---------------------------------------------------------------- views
-
-func dot(c *ui.Context, col ui.Color, size float32) {
-	ui.Column(c).Width(size).Height(size).Radius(size / 2).Background(col)
-}
-
-func (s *shell) mainView(c *ui.Context) {
-	t := c.Theme()
+// deviceLine is the remote in a line: its name, how it is connected, and
+// its charge.
+func (s *shell) deviceLine() string {
 	st := s.st
-	ui.Column(c).Fill().Padding(56, 36, 28).Gap(24).Children(func() {
-		ui.Row(c).Grow(1).Gap(32).Children(func() {
-			// left: what Yaozhi does, and today's numbers
-			ui.Column(c).Grow(1).Gap(14).Justify(ui.Center).Children(func() {
-				s.deviceChip(c)
-				ui.Text(c, "按住，说话。").FontSize(34).Bold()
-				ui.Text(c, "按住遥控器上的语音键说一句，松开，文字就出现在你正在输入的地方。").
-					FontSize(14).TextColor(t.TextMuted).MaxWidth(360)
-				ui.Row(c).Gap(28).Children(func() {
-					stat(c, fmt.Sprint(st.Count), "这次打开后说话")
-					last := "—"
-					if st.LastAudio > 0 {
-						last = fmt.Sprintf("%.1f 秒", st.LastAudio.Seconds())
-					}
-					stat(c, last, "上一段")
-				})
-			})
-			// right: what Yaozhi still needs
-			s.readiness(c)
-		})
-		ui.Row(c).Justify(ui.Center).Children(func() { s.island(c) })
-	})
-}
-
-func stat(c *ui.Context, value, label string) {
-	ui.Column(c).Gap(2).Children(func() {
-		ui.Text(c, value).FontSize(20).Bold()
-		ui.Text(c, label).FontSize(11).TextColor(c.Theme().TextMuted)
-	})
-}
-
-func (s *shell) deviceChip(c *ui.Context) {
-	t := c.Theme()
-	st := s.st
-	col, text := t.TextMuted, "未连接"
-	switch st.Conn {
-	case device.StateReady:
-		col, text = t.Success, "已连接"
-	case device.StateConnecting:
-		col, text = t.Accent, "连接中"
-	}
 	name := st.Device
 	if name == "" {
 		name = "遥控器"
 	}
-	ui.Row(c).Gap(8).AlignItems(ui.Center).Padding(6, 12, 6, 10).Radius(999).Background(t.Surface).Border(1, t.Border).
-		AlignSelf(ui.Start).Children(func() {
-		dot(c, col, 8)
-		ui.Text(c, name).Bold()
-		ui.Text(c, text).TextColor(t.TextMuted)
-	})
-}
-
-// readiness is the checklist of docs/design/permissions.html.
-func (s *shell) readiness(c *ui.Context) {
-	t := c.Theme()
-	r := s.st.Ready
-	ui.Column(c).Width(400).Gap(4).Padding(16).Radius(18).Background(t.Surface).Border(1, t.Border).
-		AlignSelf(ui.Center).Children(func() {
-		ui.Row(c).Gap(10).AlignItems(ui.Center).Padding(0, 4, 8).Children(func() {
-			ui.Text(c, "准备情况").FontSize(17).Bold()
-			ui.Spacer(c)
-			ui.Text(c, fmt.Sprintf("%d/%d", r.Steps(), app.TotalSteps)).TextColor(t.TextMuted)
-		})
-		section(c, "权限")
-		switch r.Bluetooth {
-		case app.PermGranted:
-			check(c, "bt", "蓝牙", "连接遥控器、接收语音", toneOK, "已允许", "", nil)
-		case app.PermDenied:
-			check(c, "bt", "蓝牙", "只能到系统设置里打开", toneBad, "已拒绝", "去系统设置", func() { s.guide(permissionflow.Bluetooth) })
-		default:
-			check(c, "bt", "蓝牙", "等待系统询问", toneMuted, "等待中", "", nil)
+	switch st.Conn {
+	case device.StateReady:
+		if st.BatteryKnown {
+			return fmt.Sprintf("%s · 电量 %d%%", name, st.Battery)
 		}
-		if r.Accessibility {
-			check(c, "ax", "辅助功能", "替你点 Fn，开始和结束 Typeless", toneOK, "已允许", "", nil)
-		} else {
-			label := "去授权"
-			if s.guiding {
-				label = "等待中…"
-			}
-			check(c, "ax", "辅助功能", "没有它，语音输入用不了", toneWarn, "未允许", label, func() { s.guide(permissionflow.Accessibility) })
-		}
-		section(c, "语音链路")
-		// BlackHole is the user's to install; yaozhi-mic on top of it is Yaozhi's to make.
-		switch {
-		case !r.BlackHole:
-			check(c, "vm", "虚拟麦克风", "先安装 BlackHole 2ch：brew install blackhole-2ch", toneWarn, "未安装", "复制命令", func() {
-				mygo.Clipboard.WriteText("brew install blackhole-2ch")
-			})
-		case !r.Mic && r.MicErr != "":
-			check(c, "vm", "虚拟麦克风", "yaozhi-mic："+r.MicErr, toneWarn, "未就绪", "", nil)
-		case !r.Mic:
-			check(c, "vm", "虚拟麦克风", "正在创建 yaozhi-mic…", toneBusy, "准备中", "", nil)
-		default:
-			check(c, "vm", "虚拟麦克风", "BlackHole 2ch，Typeless 从 yaozhi-mic 收音", toneOK, "已就绪", "", nil)
-		}
-		check(c, "tl", "Typeless", "在它的设置里把麦克风选为 yaozhi-mic", toneMuted, "需要你确认", "", nil)
-	})
-}
-
-func section(c *ui.Context, title string) {
-	ui.Text(c, title).FontSize(11).Bold().TextColor(c.Theme().TextMuted).Padding(8, 6, 2)
-}
-
-func check(c *ui.Context, key, title, sub string, k tone, label, action string, do func()) {
-	t := c.Theme()
-	bg := ui.Transparent
-	if k == toneWarn || k == toneBad {
-		bg = t.SurfaceHover
+		return name + " · 已连接"
+	case device.StateConnecting:
+		return name + " · 连接中"
+	case device.StateUnavailable:
+		return "蓝牙已关闭"
 	}
-	ui.Row(c.Key(key)).Gap(12).AlignItems(ui.Center).Padding(9, 10).Radius(12).Background(bg).Children(func() {
-		dot(c, k.color(t), 9)
-		ui.Column(c).Grow(1).Gap(2).Children(func() {
-			ui.Row(c).Gap(8).AlignItems(ui.Center).Children(func() {
-				ui.Text(c, title).Bold()
-				ui.Text(c, label).FontSize(11).TextColor(k.color(t))
-			})
-			ui.Text(c, sub).FontSize(12).TextColor(t.TextMuted)
-		})
-		if action != "" && do != nil {
-			if ui.PrimaryButton(c.Key(key+"-act"), action).Clicked() {
-				do()
-			}
-		}
-	})
-}
-
-// island is the status line at the bottom of the window.
-func (s *shell) island(c *ui.Context) {
-	t := c.Theme()
-	st := s.status()
-	ui.Row(c).Gap(10).AlignItems(ui.Center).Padding(10, 18).Radius(999).Background(t.Surface).Border(1, t.Border).
-		MinHeight(48).Children(func() {
-		if st.tone == toneBusy {
-			ui.Spinner(c)
-		} else {
-			dot(c, st.tone.color(t), 9)
-		}
-		ui.Text(c, st.title).Bold()
-		if st.detail != "" {
-			ui.Text(c, st.detail).TextColor(t.TextMuted)
-		}
-		if st.action != "" {
-			if ui.PrimaryButton(c.Key("island-act"), st.action).Clicked() {
-				st.do()
-			}
-		}
-	})
-}
-
-func (s *shell) panelView(c *ui.Context) {
-	t := c.Theme()
-	c.Root().Background(ui.Transparent)
-	st := s.status()
-	box := ui.Column(c).Fill()
-	if !c.Vibrancy() {
-		box.Background(t.Surface).Radius(10).Border(1, t.Border)
-	}
-	box.Padding(16).Gap(12).Children(func() {
-		ui.Row(c).Gap(10).AlignItems(ui.Center).Children(func() {
-			dot(c, st.tone.color(t), 10)
-			ui.Column(c).Gap(2).Grow(1).Children(func() {
-				ui.Text(c, "遥指").FontSize(15).Bold()
-				name := s.st.Device
-				if name == "" {
-					name = "还没连接遥控器"
-				}
-				ui.Text(c, name).FontSize(12).TextColor(t.TextMuted)
-			})
-		})
-		ui.Column(c).Gap(4).Padding(10, 12).Radius(10).Background(t.SurfaceHover).Children(func() {
-			ui.Text(c, st.title).Bold()
-			if st.detail != "" {
-				ui.Text(c, st.detail).FontSize(12).TextColor(t.TextMuted)
-			}
-		})
-		if st.action != "" {
-			if ui.Button(c.Key("panel-act"), st.action).Clicked() {
-				st.do()
-			}
-		}
-		ui.Spacer(c)
-		ui.Row(c).Gap(8).Children(func() {
-			if ui.PrimaryButton(c.Key("open"), "打开遥指").Clicked() {
-				s.showWindow()
-			}
-			ui.Spacer(c)
-			ui.Button(c.Key("quit"), "退出").OnClick(mygo.App.Quit)
-		})
-	})
+	return name + " · 未连接"
 }

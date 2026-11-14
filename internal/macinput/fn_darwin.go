@@ -78,16 +78,22 @@ func loadCG() error {
 	return cgErr
 }
 
-// CanPostEvents reports whether this process may post keyboard events.
+// CanPostEvents reports whether this process may post keyboard events: it
+// is in the Accessibility list and switched on there.
 //
-// CGPreflightPostEventAccess keeps answering false for the rest of the
-// process after the user grants Accessibility; AXIsProcessTrusted sees the
-// grant at once, so polling this function works without a restart.
+// It asks AXIsProcessTrusted alone, which sees the permission granted and
+// switched off while the process runs, so polling it works without a
+// restart (CGPreflightPostEventAccess is slower to follow). It does not
+// see Yaozhi removed from the list with "−": on 2026-11-14, on a real Mac,
+// it kept saying true then until Yaozhi was started again, as did every
+// other way of asking a running process that was tried. Yaozhi leaves it
+// at that (decided 2026-11-14): removing an app from the list while it
+// runs is rare, and seeing it takes asking a new process.
 func CanPostEvents() (bool, error) {
 	if err := loadCG(); err != nil {
 		return false, err
 	}
-	return cgPreflightPost() || axIsTrusted(), nil
+	return axIsTrusted(), nil
 }
 
 // RequestPostEvents asks macOS for the permission to post events. The first
@@ -107,7 +113,7 @@ func SetFn(down bool) error {
 	if err := loadCG(); err != nil {
 		return err
 	}
-	if !cgPreflightPost() && !axIsTrusted() {
+	if !axIsTrusted() {
 		return ErrNotTrusted
 	}
 	src := cgSourceCreate(hidSystemState)

@@ -96,6 +96,25 @@ var (
 	selSetDelegate         = objc.RegisterName("setDelegate:")
 )
 
+// Authorization is what the user decided about this app using Bluetooth.
+type Authorization int
+
+const (
+	AuthNotDetermined Authorization = iota // not asked yet: the first use asks
+	AuthRestricted
+	AuthDenied
+	AuthAllowed
+)
+
+// CurrentAuthorization reports the decision without asking for one: only
+// creating a Central shows the system's prompt.
+func CurrentAuthorization() (Authorization, error) {
+	if err := load(); err != nil {
+		return AuthNotDetermined, err
+	}
+	return Authorization(sendInt(objc.ID(clsCBCentralManager), selAuthorization)), nil
+}
+
 // NewCentral creates a CBCentralManager whose callbacks go to d. The first
 // StateChanged callback arrives asynchronously; wait for StatePoweredOn
 // before scanning or connecting. Creating the manager is what makes macOS

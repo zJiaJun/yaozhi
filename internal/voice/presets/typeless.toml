@@ -8,6 +8,13 @@ id         = "typeless"
 name       = "Typeless"
 microphone = "yaozhi-mic"   # Typeless 看不到 BlackHole，要在它的设置里选这个聚集设备
 
+# 用来判断 Typeless 装没装、开没开，以及没装时带用户去哪里下载。
+# 应用标识取自本机 Typeless 2.11.0 的 Info.plist（2026-11-14）。
+[app]
+bundle_id = "now.typeless.desktop"
+url       = "https://www.typeless.com/downloads"
+brew      = "brew install typeless"   # Homebrew 里有它，没有同名的命令行工具，不用加 --cask（2026-11-14 核对）
+
 [trigger]
 key  = "fn"
 mode = "toggle"   # toggle：点一下开始、再点一下结束；hold：按住期间听写

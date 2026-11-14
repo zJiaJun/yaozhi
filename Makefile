@@ -30,6 +30,6 @@ SIGN ?= $(shell security find-identity -p codesigning 2>/dev/null | grep -q '"ya
 yaozhi:
 	CGO_ENABLED=0 $(GO) tool mygo build -skip-dmg -sign "$(SIGN)"
 
-# App 图标：按 internal/icon 里的 A1 图形重画 resources/icon.png（MyGo 打包时转成 icns）。
+# App 图标：按 internal/icon 里的图形重画 resources/icon.png（MyGo 打包时转成 icns）。
 icon:
-	$(GO) run ./cmd/genicon -o resources/icon.png
+	$(GO) run internal/icon/gen.go -o resources/icon.png

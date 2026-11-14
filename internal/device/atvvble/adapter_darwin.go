@@ -16,6 +16,15 @@ import (
 	"github.com/zJiaJun/yaozhi/internal/device"
 )
 
+// The standard GATT services a remote tells about itself with: its charge
+// (Battery Service) and its model number (Device Information).
+const (
+	batteryServiceUUID = "180F"
+	batteryLevelUUID   = "2A19"
+	deviceInfoUUID     = "180A"
+	modelNumberUUID    = "2A24"
+)
+
 var (
 	// ErrUnauthorized: the app may not use Bluetooth. The user has to allow
 	// it in System Settings → Privacy & Security → Bluetooth.
@@ -23,6 +32,14 @@ var (
 	// ErrUnsupported: this Mac has no Bluetooth LE.
 	ErrUnsupported = errors.New("atvvble: Bluetooth LE is not supported")
 )
+
+// Asked reports whether the user was already asked about Yaozhi using
+// Bluetooth, whatever the answer: when not, the first Run shows the
+// system's prompt, which is better explained first.
+func Asked() bool {
+	a, err := cb.CurrentAuthorization()
+	return err != nil || a != cb.AuthNotDetermined
+}
 
 // Adapter finds and keeps connected one ATVV remote. The process must run
 // inside an app bundle with NSBluetoothAlwaysUsageDescription, or macOS kills
@@ -136,6 +153,7 @@ type runner struct {
 	state device.State
 	desc  *device.Descriptor // nil for an unknown remote (AcceptAny)
 	name  string
+	info  device.InfoChanged // what the connected remote told about itself
 
 	// target is the remote being connected or connected, or after a
 	// disconnect the one with a pending reconnect.
@@ -244,8 +262,9 @@ func (r *runner) connected(p cb.Peripheral) {
 	r.tx, r.audio, r.control = nil, nil, nil
 	r.subs = map[string]bool{}
 	r.link = newLink(r.emit, r.write, r.logf)
+	r.info = device.InfoChanged{Battery: -1}
 	r.setState(device.StateConnecting, nil)
-	p.DiscoverServices(atvv.ServiceUUID)
+	p.DiscoverServices(atvv.ServiceUUID, batteryServiceUUID, deviceInfoUUID)
 
 	attempt := r.attempt
 	time.AfterFunc(r.a.InitTimeout, func() {
@@ -326,17 +345,45 @@ func (r *runner) servicesDiscovered(p cb.Peripheral, err error) {
 		r.giveUp(fmt.Errorf("查找服务失败：%w", err), false)
 		return
 	}
+	voice := false
 	for _, s := range p.Services() {
-		if strings.EqualFold(s.UUID(), atvv.ServiceUUID) {
+		switch u := s.UUID(); {
+		case strings.EqualFold(u, atvv.ServiceUUID):
+			voice = true
 			p.DiscoverCharacteristics(s, atvv.TransmitUUID, atvv.AudioUUID, atvv.ControlUUID)
-			return
+		case strings.EqualFold(u, batteryServiceUUID):
+			p.DiscoverCharacteristics(s, batteryLevelUUID)
+		case strings.EqualFold(u, deviceInfoUUID):
+			p.DiscoverCharacteristics(s, modelNumberUUID)
 		}
 	}
-	r.giveUp(errors.New("设备没有 ATVV 语音服务"), true)
+	if !voice {
+		r.giveUp(errors.New("设备没有 ATVV 语音服务"), true)
+	}
 }
 
 func (r *runner) characteristicsDiscovered(p cb.Peripheral, s cb.Service, err error) {
 	if !r.isTarget(p) || r.link == nil {
+		return
+	}
+	if !strings.EqualFold(s.UUID(), atvv.ServiceUUID) {
+		// The charge and the model are extras: read what is there, and
+		// carry on without them when it is not.
+		if err != nil {
+			r.logf("查找 %s 的特征失败：%v", s.UUID(), err)
+			return
+		}
+		for _, ch := range s.Characteristics() {
+			switch u := ch.UUID(); {
+			case strings.EqualFold(u, batteryLevelUUID):
+				p.Read(ch)
+				if ch.Properties()&cb.PropNotify != 0 {
+					p.SetNotify(ch, true)
+				}
+			case strings.EqualFold(u, modelNumberUUID):
+				p.Read(ch)
+			}
+		}
 		return
 	}
 	if err != nil {
@@ -362,6 +409,12 @@ func (r *runner) characteristicsDiscovered(p cb.Peripheral, s cb.Service, err er
 
 func (r *runner) notifyStateUpdated(p cb.Peripheral, ch cb.Characteristic, err error) {
 	if !r.isTarget(p) || r.link == nil {
+		return
+	}
+	if u := ch.UUID(); !strings.EqualFold(u, atvv.AudioUUID) && !strings.EqualFold(u, atvv.ControlUUID) {
+		if err != nil {
+			r.logf("订阅 %s 失败：%v", u, err) // the charge is still read once
+		}
 		return
 	}
 	if err == nil && !ch.IsNotifying() {
@@ -405,5 +458,17 @@ func (r *runner) valueUpdated(p cb.Peripheral, ch cb.Characteristic, v []byte, e
 		}
 	case strings.EqualFold(u, atvv.AudioUUID):
 		r.link.audio(v)
+	case strings.EqualFold(u, batteryLevelUUID):
+		if len(v) > 0 && int(v[0]) != r.info.Battery {
+			r.info.Battery = int(v[0])
+			r.logf("电量 %d%%", r.info.Battery)
+			r.emit(r.info)
+		}
+	case strings.EqualFold(u, modelNumberUUID):
+		if m := strings.TrimRight(string(v), "\x00 "); m != "" && m != r.info.Model {
+			r.info.Model = m
+			r.logf("型号 %s", m)
+			r.emit(r.info)
+		}
 	}
 }

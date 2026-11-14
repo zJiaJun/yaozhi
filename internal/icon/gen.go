@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 
-// Command genicon draws the app icon into resources/icon.png, which MyGo
-// turns into the .app's icon. Run it with make icon after changing
-// internal/icon.
+//go:build ignore
+
+// This program draws the app icon into resources/icon.png, which MyGo turns
+// into the .app's icon. Run it with make icon (go run internal/icon/gen.go,
+// from the repository's root) after changing this package.
 package main
 
 import (

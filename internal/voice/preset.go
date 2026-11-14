@@ -37,6 +37,19 @@ type Preset struct {
 	Microphone string  `toml:"microphone"`
 	Trigger    Trigger `toml:"trigger"`
 	Timing     Timing  `toml:"timing"`
+	App        App     `toml:"app"`
+}
+
+// App is the input method's app, for telling whether it is installed and
+// running, and where to get it. Both are optional: without a bundle
+// identifier Yaozhi takes it to be there.
+type App struct {
+	// BundleID is the app's bundle identifier ("now.typeless.desktop").
+	BundleID string `toml:"bundle_id"`
+	// URL is where the app is downloaded from.
+	URL string `toml:"url"`
+	// Brew is the command that installs it with Homebrew, if it is there.
+	Brew string `toml:"brew"`
 }
 
 // Trigger is the shortcut that starts and stops the input method.

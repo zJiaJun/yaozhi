@@ -1,0 +1,654 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>遥指 Yaozhi · 界面设计 · 墨与朱</title>
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<!--
+  遥指的界面设计"墨与朱"，cmd/yaozhi 的实现以这里为准：
+  - 宣纸底、墨色线稿、朱砂红只留给语音键和"正在听"；不用极光、玻璃和拟物遥控器。
+  - 大标题就是状态；底部一条状态栏在每一页都在。
+  - 左侧栏导航，给 M2 的"按键"留了位置。
+  - 图标：倾斜的遥控器（也是一根手指），朱砂色语音键，指尖前两道弧。
+  遥控器线稿的几何取自 rc003.js（自己画的矢量，无照片、无商标）。
+-->
+<style>
+:root{
+  --paper:#F4F0E6; --paper2:#EBE6D9; --card:#FAF7F0; --desk:#DDD7C9;
+  --line:rgba(28,25,22,.13); --line2:rgba(28,25,22,.06);
+  --ink:#1C1916; --ink2:rgba(28,25,22,.64); --ink3:rgba(28,25,22,.4);
+  --zhu:#D5402B; --zhu-soft:rgba(213,64,43,.10); --ok:#3C7A5A; --warn:#B57A12;
+  --serif:"Songti SC","STSong","Noto Serif CJK SC",serif;
+  --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Helvetica Neue",sans-serif;
+  --mono:"SF Mono",ui-monospace,Menlo,monospace;
+  --ease:cubic-bezier(.16,1,.3,1);
+}
+body.dark{
+  --paper:#161513; --paper2:#100F0E; --card:#1E1C1A; --desk:#070707;
+  --line:rgba(238,232,219,.14); --line2:rgba(238,232,219,.06);
+  --ink:#EEE8DB; --ink2:rgba(238,232,219,.64); --ink3:rgba(238,232,219,.4);
+  --zhu:#EE5A40; --zhu-soft:rgba(238,90,64,.14); --ok:#74B892; --warn:#DDA63A;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--desk);color:var(--ink);font:13px/1.5 var(--sans);-webkit-font-smoothing:antialiased;transition:background .4s}
+button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;padding:0}
+.wrap{max-width:1120px;margin:0 auto;padding:36px 28px 80px}
+h1{font:900 44px/1.15 var(--serif);margin:0 0 10px;letter-spacing:.02em}
+h1 em{font-style:normal;color:var(--zhu)}
+h2{font:900 26px/1.2 var(--serif);margin:72px 0 6px}
+.lead{color:var(--ink2);max-width:680px;font-size:14px;margin:0}
+.eyebrow{font:600 11px var(--sans);letter-spacing:.18em;color:var(--ink3);margin-bottom:14px}
+.rules{display:grid;grid-template-columns:repeat(3,1fr);gap:0;margin:28px 0 0;border-top:1px solid var(--ink)}
+.rules div{padding:14px 18px 0 0}.rules b{font:900 17px var(--serif);display:block;margin-bottom:4px}
+.rules span{color:var(--ink2)}
+
+/* controls */
+.ctl{position:sticky;top:0;z-index:40;margin:26px -28px 22px;padding:10px 28px;display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;
+  background:color-mix(in srgb,var(--desk) 86%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+.ctl label{color:var(--ink3);font-size:12px;margin-right:6px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{padding:5px 11px;font-size:12px;color:var(--ink2)}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button.on{background:var(--ink);color:var(--paper)}
+kbd{font:600 11px var(--mono);border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:1px 6px}
+.hint{color:var(--ink3);font-size:12px;margin-left:auto}
+
+/* ---------- window ---------- */
+.fit{position:relative;width:100%}
+.win{width:1040px;height:660px;border-radius:14px;overflow:hidden;background:var(--paper);display:flex;position:absolute;left:0;top:0;transform-origin:0 0;
+  box-shadow:0 30px 80px rgba(20,16,10,.28),0 0 0 .5px rgba(0,0,0,.35);transition:background .4s}
+body.dark .win{box-shadow:0 30px 80px rgba(0,0,0,.7),0 0 0 .5px rgba(255,255,255,.16)}
+.side{width:204px;background:var(--paper2);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:16px 12px 12px;transition:background .4s}
+.lights{display:flex;gap:8px;margin:2px 0 26px 4px}
+.lights i{width:12px;height:12px;border-radius:50%;background:#ff5f57}.lights i:nth-child(2){background:#febc2e}.lights i:nth-child(3){background:#28c840}
+.brand{display:flex;align-items:center;gap:10px;padding:0 6px 22px}
+.brand svg{width:34px;height:34px;flex:none}
+.brand b{font:900 19px/1 var(--serif);display:block;letter-spacing:.08em}
+.brand span{font:500 10px var(--sans);letter-spacing:.22em;color:var(--ink3)}
+.nav button{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px;border-radius:8px;color:var(--ink2);font-size:13px;text-align:left;position:relative}
+.nav button svg{width:16px;height:16px;flex:none}
+.nav button:hover{background:var(--line2)}
+.nav button.on{color:var(--ink);font-weight:600;background:var(--line2)}
+.nav button.on::before{content:"";position:absolute;left:-12px;top:9px;bottom:9px;width:3px;background:var(--zhu);border-radius:0 2px 2px 0}
+.soon{margin-left:auto;font:600 10px var(--sans);color:var(--ink3);border:1px solid var(--line);border-radius:4px;padding:0 5px}
+.dev{margin-top:auto;border-top:1px solid var(--line);padding:12px 6px 2px;display:flex;gap:10px;align-items:center}
+.dev svg{width:12px;height:38px;flex:none;color:var(--ink2)}
+.dev b{display:block;font-size:12px;font-weight:600;line-height:1.3}
+.dev span{font-size:11px;color:var(--ink2);display:flex;align-items:center;gap:5px}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--ok);display:inline-block;flex:none}
+.dot.zhu{background:var(--zhu)}.dot.warn{background:var(--warn)}.dot.off{background:var(--ink3)}
+
+.main{flex:1;position:relative;display:flex;flex-direction:column;min-width:0}
+.page{flex:1;position:relative;display:none;padding:40px 48px 0}
+.win[data-page="overview"] #p-overview,.win[data-page="voice"] #p-voice,.win[data-page="keys"] #p-keys,.win[data-page="device"] #p-device{display:block;animation:in .5s var(--ease)}
+@keyframes in{from{opacity:0;transform:translateY(8px)}}
+.ptitle{font:900 30px/1.2 var(--serif);margin:0 0 6px}
+.pdesc{color:var(--ink2);max-width:430px;margin:0 0 26px}
+
+/* overview */
+.ready-chip{position:absolute;right:28px;top:22px;z-index:5;display:flex;align-items:center;gap:7px;padding:5px 11px;border:1px solid var(--line);border-radius:999px;font-size:12px;background:var(--paper)}
+.ready-chip i{color:var(--ink3);font-style:normal;font-family:var(--mono);font-size:11px}
+.check{position:absolute;right:28px;top:58px;z-index:6;width:292px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px 14px;
+  box-shadow:0 18px 40px rgba(20,16,10,.16);opacity:0;transform:translateY(-6px);pointer-events:none;transition:.3s var(--ease)}
+.check.open{opacity:1;transform:none;pointer-events:auto}
+.check div{display:flex;align-items:center;gap:9px;padding:9px 0;border-bottom:1px solid var(--line2);font-size:12.5px}
+.check div:last-child{border:0}.check small{margin-left:auto;color:var(--ink2);font-size:11.5px}
+.headline{font:900 76px/1.08 var(--serif);margin:26px 0 14px;letter-spacing:.01em;min-height:164px;white-space:pre-line;transition:color .3s}
+.win[data-state="listening"] .headline{color:var(--zhu)}
+.sub{color:var(--ink2);font-size:14px;max-width:380px;min-height:44px;margin:0}
+/* 试一试：出字就落在这个框里 */
+.try{width:404px;margin-top:16px;border:1px solid var(--line);border-radius:12px;background:var(--card);padding:9px 14px 8px;transition:border-color .25s}
+.try.focus{border-color:var(--ink)}
+.try.live{border-color:var(--zhu)}
+.try.miss{border-color:var(--warn)}
+.tryhd{display:flex;align-items:center;gap:8px;font:600 11px var(--sans);letter-spacing:.16em;color:var(--ink3)}
+.tryhd em{font-style:normal;letter-spacing:0;font-weight:500;font-size:11.5px;margin-left:auto;display:flex;align-items:center;gap:5px;color:var(--ink2)}
+.tryhd em.ok{color:var(--ok)}.tryhd em.warn{color:var(--warn)}
+.tryhd button{letter-spacing:0;font-weight:500;font-size:11.5px;color:var(--ink2);padding:1px 7px;border-radius:5px;border:1px solid var(--line)}
+.trytext{min-height:48px;margin:7px 0 4px;font-size:15px;line-height:1.6;color:var(--ink)}
+.trytext.ph{color:var(--ink3)}
+.caret{display:inline-block;width:1.5px;height:17px;background:var(--ink);vertical-align:-3px;margin-left:1px;animation:blink 1.1s steps(1) infinite}
+.try.live .caret{background:var(--zhu)}
+@keyframes blink{50%{opacity:0}}
+.wave{display:flex;align-items:center;gap:4px;height:22px}
+/* 平时的概览页没有输入框，只留这条波形 */
+.win:not([data-setup]) #try{border-color:transparent;background:none;padding:0;margin-top:22px}
+.win:not([data-setup]) #try .tryhd,.win:not([data-setup]) #try .trytext{display:none}
+.win:not([data-setup]) #try .wave{height:64px}
+.win:not([data-setup]) #try .wave i{background:var(--ink3)}
+.win[data-state="listening"]:not([data-setup]) #try .wave i{background:var(--zhu)}
+.wave i{flex:1;height:2px;min-height:2px;border-radius:2px;background:var(--line);transition:height .09s linear,background .3s}
+.win[data-state="listening"] .wave i,.try.live .wave i{background:var(--zhu)}
+.tries{display:grid;grid-template-columns:repeat(2,404px);gap:18px 30px;margin-top:22px}
+.tries figure{margin:0}.tries figcaption{font-size:12px;color:var(--ink2);margin-top:8px;max-width:404px}
+.tries figcaption b{color:var(--ink)}
+.tries .try{margin-top:0;background:var(--card)}
+/* 冷启动：概览页就是引导 */
+.setup{display:none;width:404px}
+.win[data-setup] .setup{display:block}
+.win[data-setup] #headline,.win[data-setup] #sub,.win[data-setup] #try,.win[data-setup] .stats,.win[data-setup] #chip,.win[data-setup] #check{display:none}
+.setup h4{font:900 64px/1.1 var(--serif);margin:22px 0 16px;letter-spacing:.01em}
+.steps{border-top:1px solid var(--ink)}
+.stp{border-bottom:1px solid var(--line);padding:8px 0}
+.stp .hd{display:flex;align-items:center;gap:10px;font-size:13px}
+.stp .n{width:18px;height:18px;border-radius:50%;flex:none;display:grid;place-items:center;font:600 10.5px var(--mono);border:1px solid var(--ink3);color:var(--ink3)}
+.stp.cur .n{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+.stp.ok .n{background:var(--ok);border-color:var(--ok);color:#fff}
+.stp .t{font-weight:600;color:var(--ink3)}
+.stp.cur .t,.stp.ok .t{color:var(--ink)}
+.stp .st{margin-left:auto;font-size:11.5px;color:var(--ink2)}
+.stp .bd{display:none;margin:6px 0 4px 28px;font-size:12.5px;color:var(--ink2);line-height:1.55}
+.stp.cur .bd{display:block}
+.stp code{display:inline-block;font:12px var(--mono);background:var(--paper2);border:1px solid var(--line);border-radius:6px;padding:2px 8px;margin:6px 0 0;color:var(--ink)}
+.stp .acts{display:flex;gap:8px;margin-top:9px}
+.stp .try{width:auto;margin-top:9px}
+.stp .try .trytext{min-height:26px}
+/* 关于 */
+.aboutrow{display:grid;grid-template-columns:300px 1fr;gap:44px;align-items:start;margin-top:22px}
+.about{border-radius:12px;background:#ececec;color:#1d1d1f;text-align:center;padding:0 0 22px;box-shadow:0 18px 50px rgba(0,0,0,.28),0 0 0 .5px rgba(0,0,0,.25);font-family:var(--sans)}
+body.dark .about{background:#2a2a2c;color:#f2f2f2}
+.about .tb{height:28px;display:flex;align-items:center;gap:8px;padding:0 10px}
+.about .tb i{width:12px;height:12px;border-radius:50%;background:#ff5f57}.about .tb i:nth-child(2),.about .tb i:nth-child(3){background:rgba(128,128,128,.35)}
+.about svg{width:84px;height:84px;display:block;margin:4px auto 6px}
+.about b{font-size:14px;display:block}.about p{margin:3px 0 0;font-size:11px;opacity:.7}
+.where{border-top:1px solid var(--ink)}
+.where div{display:flex;gap:14px;padding:12px 0;border-bottom:1px solid var(--line);font-size:13px}
+.where b{width:120px;flex:none}.where span{color:var(--ink2)}
+.stats{position:absolute;left:48px;bottom:26px;display:flex;border-top:1px solid var(--ink);width:404px}
+.stats div{flex:1;padding-top:10px}
+.stats b{font:900 30px/1 var(--serif);display:block}.stats b small{font:500 12px var(--sans);color:var(--ink2);margin-left:3px}
+.stats span{font-size:11.5px;color:var(--ink2)}
+.rm{position:absolute;right:56px;top:74px;height:506px;color:var(--ink)}
+.rm svg,.rm2 svg{height:100%;display:block;overflow:visible}
+.rm .ln,.rm2 .ln{fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.rm .key,.rm2 .key{fill:var(--paper);stroke:currentColor;stroke-width:2.2;transition:fill .2s}
+.rm .body,.rm2 .body{fill:var(--card);stroke:currentColor;stroke-width:2.2}
+.rm .v,.rm2 .v{stroke:var(--zhu);color:var(--zhu)}
+.rm .call,.rm2 .call{stroke:var(--zhu);stroke-width:1.6;fill:none;stroke-dasharray:1 7;stroke-linecap:round}
+.rm text,.rm2 text{font:600 22px var(--sans);fill:var(--zhu);text-anchor:end}
+.rm text.s{font-weight:400;fill:var(--ink2);font-size:19px}
+.rings circle{fill:none;stroke:var(--zhu);stroke-width:1.6;transform-box:fill-box;transform-origin:center;opacity:0}
+.win[data-state="listening"] .rings circle{animation:ring 1.8s cubic-bezier(.2,.7,.3,1) infinite}
+.win[data-state="listening"] .rings circle:nth-child(2){animation-delay:.6s}.win[data-state="listening"] .rings circle:nth-child(3){animation-delay:1.2s}
+@keyframes ring{0%{transform:scale(1);opacity:.8}100%{transform:scale(4);opacity:0}}
+.win[data-state="listening"] .key.v{fill:var(--zhu)}
+.win[data-state="listening"] .gv{color:var(--paper);stroke:var(--paper)}
+.win[data-state="blocked"] .rm .v{stroke:var(--ink3);color:var(--ink3)}
+.win[data-state="blocked"] .rm .call{stroke:var(--ink3)}.win[data-state="blocked"] .rm text{fill:var(--ink3)}
+
+/* status bar */
+.bar{height:50px;border-top:1px solid var(--line);display:flex;align-items:center;gap:10px;padding:0 20px 0 48px;font-size:12.5px;flex:none}
+.bar .msg{font-weight:600}.bar .t{font-family:var(--mono);font-size:12px;color:var(--ink2)}
+.bar .act{padding:4px 12px;border-radius:999px;background:var(--ink);color:var(--paper);font-size:12px;font-weight:600;display:none}
+.win[data-state="blocked"] .bar .act{display:block}
+.spin{width:12px;height:12px;border-radius:50%;border:1.6px solid var(--line);border-top-color:var(--ink);animation:sp .8s linear infinite;display:none}
+@keyframes sp{to{transform:rotate(360deg)}}
+.win[data-state="draining"] .spin{display:block}.win[data-state="draining"] .bar .dot{display:none}
+.chain{margin-left:auto;display:flex;align-items:center;color:var(--ink3);font-size:11.5px}
+.chain span{display:flex;align-items:center;gap:6px;transition:color .3s}
+.chain span::before{content:"";width:5px;height:5px;border-radius:50%;border:1px solid currentColor}
+.chain u{width:26px;height:1px;background:var(--line);margin:0 8px;text-decoration:none;position:relative;overflow:hidden}
+.win[data-state="listening"] .chain span,.win[data-state="draining"] .chain span{color:var(--ink)}
+.win[data-state="listening"] .chain span::before,.win[data-state="draining"] .chain span::before{background:var(--zhu);border-color:var(--zhu)}
+.win[data-state="listening"] .chain u::after,.win[data-state="draining"] .chain u::after{content:"";position:absolute;inset:0;width:12px;background:var(--zhu);animation:run .9s linear infinite}
+@keyframes run{from{transform:translateX(-12px)}to{transform:translateX(26px)}}
+.win[data-state="blocked"] .chain span:nth-of-type(n+2){text-decoration:line-through}
+
+/* settings pages */
+.cols{display:grid;grid-template-columns:1fr 250px;gap:44px}
+.rows{border-top:1px solid var(--ink)}
+.row{display:flex;align-items:center;gap:12px;padding:13px 0;border-bottom:1px solid var(--line)}
+.row b{font-weight:600;font-size:13px}.row small{display:block;color:var(--ink2);font-size:11.5px}
+.row .r{margin-left:auto;color:var(--ink2);display:flex;align-items:center;gap:8px;font-size:12.5px}
+.tog{width:36px;height:21px;border-radius:999px;background:var(--zhu);position:relative}
+.tog::after{content:"";position:absolute;right:2px;top:2px;width:17px;height:17px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+.sl{width:150px;height:2px;background:var(--line);position:relative}
+.sl::before{content:"";position:absolute;left:0;top:0;bottom:0;width:62%;background:var(--ink)}
+.sl::after{content:"";position:absolute;left:62%;top:-6px;width:14px;height:14px;margin-left:-7px;border-radius:50%;background:var(--paper);border:1.6px solid var(--ink)}
+.btn{padding:6px 14px;border:1px solid var(--ink);border-radius:999px;font-size:12px;font-weight:600}
+.btn.fill{background:var(--ink);color:var(--paper)}
+.btn:hover{background:var(--ink);color:var(--paper)}
+.btns{display:flex;gap:10px;margin-top:22px}
+.path h4,.cap{font:600 11px var(--sans);letter-spacing:.16em;color:var(--ink3);margin:0 0 12px}
+.path ol{list-style:none;margin:0;padding:0}
+.path li{position:relative;padding:0 0 20px 24px;font-size:12.5px}
+.path li b{display:block;font-weight:600}.path li small{color:var(--ink2);font-size:11.5px}
+.path li::before{content:"";position:absolute;left:3px;top:5px;width:9px;height:9px;border-radius:50%;background:var(--ok)}
+.path li::after{content:"";position:absolute;left:7px;top:18px;bottom:0;width:1px;background:var(--line)}
+.path li:last-child::after{display:none}.path li:first-child::before{background:var(--zhu)}
+.rm2{position:absolute;left:64px;top:36px;height:540px;color:var(--ink)}
+.rm2 .key{cursor:pointer}.rm2 .key:hover,.rm2 .key.sel{fill:var(--zhu-soft)}
+.keys{margin-left:250px}
+.keys .row{padding:8px 0}.keys .row.sel{background:var(--zhu-soft);box-shadow:-10px 0 0 var(--zhu-soft),10px 0 0 var(--zhu-soft)}
+.keys .k{width:92px;font-weight:600}.keys .r{font-size:12px}
+.note{display:inline-flex;gap:8px;align-items:center;border:1px dashed var(--line);border-radius:8px;padding:6px 12px;color:var(--ink2);font-size:12px;margin-bottom:16px}
+.facts{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--ink);margin-top:6px}
+.facts div{padding:14px 0 18px;border-bottom:1px solid var(--line)}
+.facts span{font-size:11.5px;color:var(--ink2);display:block}.facts b{font:900 22px var(--serif)}
+.facts b small{font:500 12px var(--sans);color:var(--ink2)}
+
+/* ---------- menu bar ---------- */
+.two{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:22px}
+.mb{border-radius:14px;overflow:hidden;position:relative;height:330px;background:linear-gradient(150deg,#c9bfa9,#b9a98c 60%,#a38f72)}
+.mb.d{background:linear-gradient(150deg,#2a2622,#1a1715 60%,#3a2a22)}
+.mb .strip{height:26px;display:flex;align-items:center;justify-content:flex-end;gap:16px;padding:0 14px;font-size:12.5px;background:rgba(255,255,255,.28);color:#1c1916;backdrop-filter:blur(10px)}
+.mb.d .strip{background:rgba(0,0,0,.28);color:#f1ebdf}
+.mb .strip svg{width:18px;height:18px}
+.mb .gl{padding:2px 6px;border-radius:5px;background:rgba(0,0,0,.12);display:grid}.mb.d .gl{background:rgba(255,255,255,.16)}
+.pop{position:absolute;right:54px;top:32px;width:250px;border-radius:10px;padding:5px;background:rgba(240,240,240,.94);color:#1d1d1f;
+  box-shadow:0 18px 50px rgba(0,0,0,.3),0 0 0 .5px rgba(0,0,0,.2);backdrop-filter:blur(20px);font-size:12.5px}
+.mb.d .pop{background:rgba(44,44,46,.94);color:#f2f2f2;box-shadow:0 18px 50px rgba(0,0,0,.6),0 0 0 .5px rgba(255,255,255,.18)}
+.pop .hd{padding:10px 10px 12px;border-bottom:1px solid rgba(128,120,105,.25);margin-bottom:5px}
+.pop .hd b{font:900 17px var(--serif);display:block}.pop .hd span{opacity:.65;font-size:11.5px;display:flex;align-items:center;gap:6px}
+.pop .it{display:flex;align-items:center;padding:6px 10px;border-radius:6px}.pop .it small{margin-left:auto;opacity:.6;font-size:11.5px}
+.pop .it.dis{opacity:.38}.pop hr{border:0;border-top:1px solid rgba(128,120,105,.25);margin:5px 10px}
+.pop .live{display:flex;align-items:center;gap:3px;height:16px;margin-left:auto}.pop .live i{width:2px;background:#ee5a40;border-radius:1px}
+.glyphs{display:flex;gap:26px;margin-top:20px;flex-wrap:wrap}
+.glyphs figure{margin:0;text-align:center;font-size:11.5px;color:var(--ink2)}
+.glyphs .bx{width:72px;height:72px;border:1px solid var(--line);border-radius:12px;display:grid;place-items:center;margin-bottom:6px;background:var(--card)}
+.glyphs svg{width:36px;height:36px}
+
+/* ---------- icon ---------- */
+.iconrow{display:grid;grid-template-columns:340px 1fr;gap:40px;align-items:center;margin-top:24px}
+.big svg{width:340px;height:340px;display:block}
+.alts{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.alts figure,.ramp figure{margin:0;font-size:12px;color:var(--ink2)}
+.alts svg{width:100%;display:block}.alts b{color:var(--ink);font:900 15px var(--serif);display:block}
+.pick{color:var(--zhu);font:600 10px var(--sans);letter-spacing:.14em;border:1px solid var(--zhu);border-radius:4px;padding:0 5px;margin-left:6px;vertical-align:2px}
+.ramp{display:flex;align-items:flex-end;gap:26px;margin-top:30px;padding:22px;border:1px solid var(--line);border-radius:14px;background:var(--card)}
+.ramp figure{text-align:center}.ramp svg{display:block;margin:0 auto 6px}
+.dock{margin-top:24px;display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.dock>div{border-radius:14px;padding:44px 0 14px;display:flex;justify-content:center;background:linear-gradient(150deg,#c9bfa9,#b9a98c 60%,#a38f72)}
+.dock>div.d{background:linear-gradient(150deg,#2a2622,#1a1715 60%,#3a2a22)}
+.shelf{display:flex;gap:6px;padding:6px 8px;border-radius:20px;background:rgba(255,255,255,.3);box-shadow:0 0 0 .5px rgba(255,255,255,.5) inset;backdrop-filter:blur(10px)}
+.d .shelf{background:rgba(60,56,52,.45);box-shadow:0 0 0 .5px rgba(255,255,255,.18) inset}
+.shelf svg,.shelf i{width:58px;height:58px;display:block}
+.shelf i{transform:scale(.805);border-radius:14px;box-shadow:0 2px 4px rgba(0,0,0,.2)}
+
+/* tokens */
+.sw{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-top:22px}
+.sw div{height:74px;border-radius:10px;border:1px solid var(--line);padding:8px 10px;font-size:11px;display:flex;flex-direction:column;justify-content:flex-end}
+.sw b{font-weight:600}.sw span{font-family:var(--mono);opacity:.7;font-size:10px}
+.type{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:24px}
+.type>div{border-top:1px solid var(--ink);padding-top:12px}
+.type .a{font:900 46px/1.1 var(--serif)}.type .b{font-size:15px}.type small{color:var(--ink2);display:block;margin-top:6px}
+ul.diff{color:var(--ink2);padding-left:18px;max-width:760px;font-size:13.5px}ul.diff b{color:var(--ink)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">遥指 YAOZHI · 界面设计</div>
+  <h1>墨与<em>朱</em></h1>
+  <p class="lead">名字出自"牧童遥指杏花村"。界面只用纸、墨和一点朱砂：平时是安静的黑白线稿，只有语音键和"正在听"是红的，一眼就知道现在在不在收音。</p>
+  <div class="rules">
+    <div><b>标题就是状态</b><span>大字直接写现在在做什么，不用再去找状态岛。</span></div>
+    <div><b>线稿，不拟物</b><span>遥控器只画轮廓和按键，换设备只换一套线。</span></div>
+    <div><b>红色只做一件事</b><span>朱砂红只表示语音。成功用松绿，提醒用藤黄。</span></div>
+  </div>
+
+  <div class="ctl">
+    <span><label>外观</label><span class="seg" id="theme"><button data-v="light" class="on">浅色</button><button data-v="dark">深色</button></span></span>
+    <span><label>状态</label><span class="seg" id="state"><button data-v="ready" class="on">就绪</button><button data-v="listening">正在听</button><button data-v="draining">收尾</button><button data-v="done">完成</button><button data-v="blocked">缺权限</button></span></span>
+    <span><label>冷启动</label><span class="seg" id="setupseg"><button data-v="1">1 遥控器</button><button data-v="2">2 BlackHole</button><button data-v="3">3 Typeless</button><button data-v="4">4 辅助功能</button><button data-v="5">5 试一句</button><button data-v="6">完成</button></span></span>
+    <span class="hint">按住 <kbd>空格</kbd> 模拟按住语音键</span>
+  </div>
+
+  <!-- ================= main window ================= -->
+  <div class="fit" id="fit">
+  <div class="win" id="win" data-page="overview" data-state="ready">
+    <aside class="side">
+      <div class="lights"><i></i><i></i><i></i></div>
+      <div class="brand"><span id="brandmark"></span><div><b>遥指</b><span>YAOZHI · 0.0.1</span></div></div>
+      <div class="nav" id="nav">
+        <button data-p="overview" class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none"/></svg>概览</button>
+        <button data-p="voice"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M4 12h1M8 8v8M12 4.5v15M16 9v6M20 12h-1"/></svg>语音</button>
+        <button data-p="keys"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="8" y="2.5" width="8" height="19" rx="4"/><circle cx="12" cy="8" r="1.8"/><path d="M12 13.5v.01M12 17v.01"/></svg>按键</button>
+        <button data-p="device"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7l10 10-5 5V2l5 5L7 17"/></svg>设备</button>
+      </div>
+      <div class="dev">
+        <svg viewBox="0 0 12 38" fill="none" stroke="currentColor" stroke-width="1.2"><rect x=".8" y=".8" width="10.4" height="36.4" rx="3"/><circle cx="6" cy="10" r="3"/><circle cx="8.3" cy="4" r=".9" fill="#D5402B" stroke="none"/></svg>
+        <div><b>小米蓝牙遥控器 2 Pro</b><span><i class="dot"></i>已连接 · 电量 82%</span></div>
+      </div>
+    </aside>
+
+    <div class="main">
+      <!-- overview -->
+      <section class="page" id="p-overview">
+        <button class="ready-chip" id="chip"><i class="dot" id="chipdot"></i><span id="chiptxt">一切就绪</span><i id="chipn">5/5</i></button>
+        <div class="check" id="check">
+          <div><i class="dot"></i>蓝牙<small>已允许</small></div>
+          <div><i class="dot" id="axdot"></i>辅助功能<small id="axtxt">已允许</small></div>
+          <div><i class="dot"></i>麦克风 yaozhi-mic<small>已就绪</small></div>
+          <div><i class="dot"></i>Typeless<small>已出字</small></div>
+        </div>
+        <div class="eyebrow">概览</div>
+        <div class="setup"><h4 id="setuphead"></h4><div class="steps" id="steps"></div></div>
+        <div class="headline" id="headline"></div>
+        <p class="sub" id="sub"></p>
+        <div class="try focus" id="try">
+          <div class="tryhd">试一试<em id="trynote"></em><button id="tryclear" hidden>清空</button></div>
+          <div class="trytext" id="trytext"></div>
+          <div class="wave" id="wave"></div>
+        </div>
+        <div class="stats">
+          <div><b>12</b><span>今天说话</span></div>
+          <div><b>3.4<small>秒</small></b><span>平均时长</span></div>
+          <div><b>430<small>ms</small></b><span>松开后出字</span></div>
+        </div>
+        <div class="rm" id="rm"></div>
+      </section>
+
+      <!-- voice -->
+      <section class="page" id="p-voice">
+        <div class="eyebrow">语音</div>
+        <h3 class="ptitle">语音输入</h3>
+        <p class="pdesc">按住语音键说话，松开后遥指等声音全部送完，再通知 Typeless 结束。遥指不识别、不保存语音。</p>
+        <div class="cols">
+          <div>
+            <div class="rows">
+              <div class="row"><div><b>启用语音输入</b><small>关掉后语音键交还给系统</small></div><div class="r"><i class="tog"></i></div></div>
+              <div class="row"><div><b>输入法</b><small>点一下开始，再点一下结束</small></div><div class="r">Typeless ›</div></div>
+              <div class="row"><div><b>麦克风</b><small>Typeless 里也选它</small></div><div class="r"><i class="dot"></i>yaozhi-mic</div></div>
+              <div class="row"><div><b>音量增益</b></div><div class="r"><i class="sl"></i><span style="font-family:var(--mono);font-size:12px">+6 dB</span></div></div>
+            </div>
+            <div class="btns"><button class="btn fill">播放测试音</button><button class="btn">重新检查</button></div>
+          </div>
+          <div class="path"><h4>声音的去向</h4><ol>
+            <li><b>语音键</b><small>遥控器 · 16 kHz</small></li>
+            <li><b>遥指</b><small>解码，补上开头</small></li>
+            <li><b>yaozhi-mic</b><small>BlackHole 2ch</small></li>
+            <li><b>Typeless</b><small>识别并上屏</small></li>
+          </ol></div>
+        </div>
+      </section>
+
+      <!-- keys -->
+      <section class="page" id="p-keys">
+        <div class="rm2" id="rm2"></div>
+        <div class="keys">
+          <div class="eyebrow">按键</div>
+          <h3 class="ptitle">每个键做什么</h3>
+          <div class="note">现在只接管语音键，其余按键交给系统</div>
+          <div class="rows" id="keyrows"></div>
+        </div>
+      </section>
+
+      <!-- device -->
+      <section class="page" id="p-device">
+        <div class="eyebrow">设备</div>
+        <h3 class="ptitle">小米蓝牙遥控器 2 Pro</h3>
+        <p class="pdesc">型号 RC003 · 语音通道 ATVV 1.0 · 16 kHz</p>
+        <div class="facts">
+          <div><span>连接</span><b>已连接</b></div>
+          <div><span>电量</span><b>82<small> %</small></b></div>
+          <div><span>断线后</span><b>自动重连</b></div>
+        </div>
+        <div class="rows" style="border-top:0">
+          <div class="row"><div><b>蓝牙</b><small>连接遥控器并接收语音</small></div><div class="r"><i class="dot"></i>已允许</div></div>
+          <div class="row"><div><b>辅助功能</b><small>替你点一下输入法的快捷键</small></div><div class="r"><i class="dot"></i>已允许</div></div>
+        </div>
+        <div class="btns"><button class="btn fill">配对新遥控器</button><button class="btn">导出诊断</button></div>
+      </section>
+
+      <div class="bar">
+        <i class="dot" id="bardot"></i><i class="spin"></i>
+        <span class="msg" id="barmsg"></span><span class="t" id="bart"></span>
+        <button class="act" id="baract">去授权</button>
+        <div class="chain"><span>语音键</span><u></u><span>遥指</span><u></u><span>yaozhi-mic</span><u></u><span>Typeless</span></div>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <!-- ================= menu bar ================= -->
+  <h2>菜单栏</h2>
+  <p class="lead">用系统自己的菜单。第一行灰字是遥控器和电量，下面是能做的几件事；说话时不改菜单，由图标前面多出的一道弧表示。</p>
+  <div class="two">
+    <div class="mb"><div class="strip"><span>Wi-Fi</span><span class="gl" data-g="idle"></span><span>周三 21:40</span></div>
+      <div class="pop"><div class="it dis">小米蓝牙遥控器 2 Pro · 电量 82%</div><hr>
+        <div class="it">暂停语音输入</div><div class="it">打开遥指…</div><div class="it">关于遥指</div><hr><div class="it">退出遥指</div></div></div>
+    <div class="mb d"><div class="strip"><span>Wi-Fi</span><span class="gl" data-g="live"></span><span>周三 21:40</span></div>
+      <div class="pop"><div class="it dis">小米蓝牙遥控器 2 Pro · 电量 82%</div><hr>
+        <div class="it">暂停语音输入</div><div class="it">打开遥指…</div><div class="it">关于遥指</div><hr><div class="it">退出遥指</div></div></div>
+  </div>
+  <div class="glyphs" id="glyphs"></div>
+
+  <!-- ================= cold start ================= -->
+  <h2>冷启动：概览页就是引导</h2>
+  <p class="lead">不另做向导窗口。还没准备好时，概览页的大标题写“还差几步”，下面按顺序列出五件事：做完的打勾，当前这一步展开，写清楚要做什么并给出按钮。五步都完成后，这一列换回平时的样子。上面的主窗口可以用“冷启动”那排按钮逐步查看。</p>
+  <div class="where" style="margin-top:22px;max-width:860px">
+    <div><b>1 连接遥控器</b><span>先说明用途，点“继续”才触发系统的蓝牙询问。没配对的，告诉他同时长按主页键和菜单键，并给“打开蓝牙设置”。</span></div>
+    <div><b>2 安装 BlackHole 2ch</b><span>没装时给出 <code style="font:12px var(--mono)">brew install blackhole-2ch</code> 和“复制命令”，另有“打开下载页”给不用 Homebrew 的人。装好后遥指自己发现，并创建 yaozhi-mic，不用再点。</span></div>
+    <div><b>3 安装 Typeless</b><span>没装时给 <code style="font:12px var(--mono)">brew install typeless</code> 和“复制命令”，另有“打开 Typeless 官网”；装了没开时按钮变成“打开 Typeless”。遥指按应用标识判断，名字和网址写在输入法预设里。</span></div>
+    <div><b>4 允许辅助功能</b><span>说明只替你点 Fn，按钮“去授权”，沿用现在的授权引导。</span></div>
+    <div><b>5 选麦克风，说一句</b><span>提示在 Typeless 的“选择麦克风”里选 yaozhi-mic，然后直接在这一步里的输入框说一句。出字了，就全部完成。</span></div>
+    <div><b>完成</b><span>第 5 步出字后不马上换页：标题变成“准备好了。”，五步全打勾，刚说的那句话留在框里，下面一句说明和“开始使用”。点了才换成平时的概览页，那里没有输入框。</span></div>
+  </div>
+
+  <!-- ================= try it ================= -->
+  <h2>试一试：在遥指里看到出字</h2>
+  <p class="lead">冷启动的第 5 步里有一个输入框。光标默认就在这个框里，按住语音键说一句，文字直接落在这里，不用切到别的 App 去验证。出字了，这一步才算完成。平时的概览页不放这个框，保持标题、波形和统计。下面是它的四种状态。</p>
+  <div class="tries" id="tries"></div>
+
+  <!-- ================= about ================= -->
+  <h2>版本信息</h2>
+  <p class="lead">版本号平时看得见，详细信息放进系统标准的“关于”面板。</p>
+  <div class="aboutrow">
+    <div class="about"><div class="tb"><i></i><i></i><i></i></div><span id="abouticon"></span>
+      <b>遥指</b><p>版本 0.0.1（a1b2c3d）</p><p style="margin-top:10px">用遥控器控制 Mac</p><p>© 2026 zhujiajun · GPL-3.0-only</p></div>
+    <div class="where">
+      <div><b>侧栏名字下面</b><span>“YAOZHI · 0.0.1”，随时看得到，报问题时不用找。</span></div>
+      <div><b>菜单栏菜单</b><span>多一项“关于遥指”，打开左边这个系统标准面板：图标、名称、版本和构建号、版权和许可。</span></div>
+      <div><b>应用菜单</b><span>屏幕左上角“遥指 → 关于遥指”打开同一个面板，这是 macOS 的惯例。</span></div>
+      <div><b>导出的诊断</b><span>第一行已经带版本号，这次补上构建号。</span></div>
+    </div>
+  </div>
+
+  <!-- ================= icon ================= -->
+  <h2>图标</h2>
+  <p class="lead">一支斜着的遥控器，同时也是一根伸出去的手指。朱砂色的圆点是语音键，指尖前的两道弧是"遥"。小尺寸时去掉圆环和外弧，只留机身、红点和一道弧。</p>
+  <div class="iconrow">
+    <div class="big" id="bigicon"></div>
+    <div>
+      <div class="alts" id="alts"></div>
+    </div>
+  </div>
+  <div class="ramp" id="ramp"></div>
+  <div class="dock"><div><div class="shelf" id="dockL"></div></div><div class="d"><div class="shelf" id="dockD"></div></div></div>
+
+  <!-- ================= tokens ================= -->
+  <h2>颜色与字</h2>
+  <div class="sw" id="sw"></div>
+  <div class="type">
+    <div><div class="a">按住，说话。</div><small>标题：宋体-简 Black（Songti SC）。数字同用宋体。</small></div>
+    <div><div class="b">按住遥控器上的语音键说一句，松开，文字就出现在你正在输入的地方。</div><small>正文和控件：系统字体（苹方 / SF），13 px。时间和数值用 SF Mono。</small></div>
+  </div>
+
+</div>
+
+<script>
+// ---------- line remote (geometry from rc003.js: 200 × 840) ----------
+function remote(call){
+  const c=(k,x,y,r,cls='')=>`<circle class="key ${cls}" data-k="${k}" cx="${x}" cy="${y}" r="${r}"/>`;
+  return `<svg viewBox="${call?-190:-10} -10 ${call?400:220} 860" xmlns="http://www.w3.org/2000/svg">
+  <rect class="body" x="4" y="4" width="192" height="832" rx="30"/>
+  <g class="rings"><circle cx="142" cy="80" r="22"/><circle cx="142" cy="80" r="22"/><circle cx="142" cy="80" r="22"/></g>
+  ${c('power',58,80,22)}<path class="ln" d="M58 70.5v8.5M50.6 75.5a10.2 10.2 0 1 0 14.8 0"/>
+  ${c('voice',142,80,22,'v')}<g class="v gv"><rect x="137.5" y="68" width="9" height="15" rx="4.5" fill="currentColor"/><path class="ln" style="stroke:currentColor" d="M133 80a9 9 0 0 0 18 0M142 89v4"/></g>
+  ${c('ring',100,208,83)}${c('ok',100,208,44)}
+  <path class="ln" d="M94 148l6-6 6 6M94 268l6 6 6-6M40 202l-6 6 6 6M160 202l6 6-6 6"/>
+  ${c('back',62,348,31)}<path class="ln" d="M71 348H53M60 341l-7 7 7 7"/>
+  ${c('home',62,425,31)}<path class="ln" d="M51 426l11-10 11 10M55 424v10h14v-10"/>
+  ${c('menu',62,502,31)}<path class="ln" d="M53 495h18M53 502h18M53 509h18"/>
+  <rect class="key" data-k="vol" x="110" y="317" width="62" height="139" rx="31"/><path class="ln" d="M141 341v14M134 348h14M134 425h14"/>
+  ${c('tv',141,502,31)}<path class="ln" d="M130 493h22v15h-22zM136 513h10"/>
+  ${call?`<path class="call" d="M118 80H-22"/><text x="-32" y="76">语音键</text><text class="s" x="-32" y="102">按住说话</text>`:''}
+  </svg>`;
+}
+rm.innerHTML=remote(true); rm2.innerHTML=remote(false);
+
+// ---------- app icon ----------
+let uid=0;
+const IC={
+  ink:{p1:'#2E2A26',p2:'#100E0D',b1:'#FCF8EF',b2:'#D9D1BF',mark:'#1C1916',dot:'#E2472E',arc:'#F4EFE4',edge:'rgba(255,255,255,.14)'},
+  zhu:{p1:'#EA5A3E',p2:'#BE3019',b1:'#FFFBF2',b2:'#F1E5D0',mark:'#C8371F',dot:'#1C1916',arc:'#FFF4E4',edge:'rgba(255,255,255,.3)'},
+  paper:{p1:'#FDFBF5',p2:'#E4DCCB',b1:'#34302B',b2:'#12100F',mark:'#F4EFE4',dot:'#E2472E',arc:'#1C1916',edge:'rgba(255,255,255,.9)'},
+};
+function appIcon(v='ink',detail=true,px){
+  const P=IC[v],id='ic'+(uid++);
+  return `<svg viewBox="0 0 1024 1024" ${px?`width="${px}" height="${px}"`:''} xmlns="http://www.w3.org/2000/svg"><defs>
+  <linearGradient id="${id}p" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${P.p1}"/><stop offset="1" stop-color="${P.p2}"/></linearGradient>
+  <linearGradient id="${id}b" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${P.b1}"/><stop offset="1" stop-color="${P.b2}"/></linearGradient>
+  <filter id="${id}s" x="-20%" y="-20%" width="140%" height="150%"><feGaussianBlur stdDeviation="16"/></filter>
+  <filter id="${id}g" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="26"/></filter></defs>
+  <rect x="112" y="124" width="800" height="812" rx="186" fill="#000" opacity=".26" filter="url(#${id}s)"/>
+  <rect x="100" y="100" width="824" height="824" rx="186" fill="url(#${id}p)"/>
+  <rect x="102" y="102" width="820" height="820" rx="184" fill="none" stroke="${P.edge}" stroke-width="4"/>
+  <g transform="translate(${detail?470:482} ${detail?566:560}) rotate(40) scale(${detail?1:1.22})">
+    <rect x="-99" y="-286" width="198" height="572" rx="99" fill="#000" opacity=".3" filter="url(#${id}s)" transform="translate(-10 22)"/>
+    <rect x="-99" y="-286" width="198" height="572" rx="99" fill="url(#${id}b)"/>
+    ${detail?`<circle cx="0" cy="-34" r="60" fill="none" stroke="${P.mark}" stroke-width="15" opacity=".92"/>
+    <circle cx="0" cy="96" r="13" fill="${P.mark}" opacity=".85"/><circle cx="0" cy="152" r="13" fill="${P.mark}" opacity=".85"/>`:''}
+    ${v==='ink'&&detail?`<circle cx="0" cy="-186" r="56" fill="${P.dot}" opacity=".5" filter="url(#${id}g)"/>`:''}
+    <circle cx="0" cy="-186" r="${detail?48:60}" fill="${P.dot}"/>
+    <path d="M-70 -377A140 140 0 0 1 70 -377" fill="none" stroke="${P.arc}" stroke-width="${detail?30:40}" stroke-linecap="round"/>
+    ${detail?`<path d="M-110 -447A220 220 0 0 1 110 -447" fill="none" stroke="${P.arc}" stroke-width="30" stroke-linecap="round" opacity=".45"/>`:''}
+  </g></svg>`;
+}
+brandmark.innerHTML=appIcon('ink',false);
+bigicon.innerHTML=appIcon('ink');
+alts.innerHTML=[['ink','甲 · 墨底','深色底，机身是纸色，红点最亮。Dock 里沉稳、好认。',1],['paper','乙 · 纸底','和浅色界面最一致，接近现在的 A1。',0],['zhu','丙 · 朱印','整枚是一方印章，最醒目，但红色不再只属于语音。',0]]
+  .map(([v,n,d,p])=>`<figure>${appIcon(v)}<b>${n}${p?'<span class="pick">推荐</span>':''}</b>${d}</figure>`).join('');
+ramp.innerHTML=[256,128,64,32,16].map(s=>`<figure>${appIcon('ink',s>32,s)}${s} px</figure>`).join('');
+const filler=['#8a9a86','#b7a27e','#6f7f95','#c98f6b','#9b8aa6'];
+const shelf=()=>filler.slice(0,3).map(c=>`<i style="background:${c}"></i>`).join('')+appIcon('ink')+filler.slice(3).map(c=>`<i style="background:${c}"></i>`).join('')+appIcon('paper');
+dockL.innerHTML=shelf(); dockD.innerHTML=shelf();
+
+// ---------- menu bar glyph (template image, 18 pt) ----------
+function glyph(s){
+  const id='g'+(uid++),live=s==='live',paused=s==='paused';
+  return `<svg viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg"><defs><mask id="${id}"><rect x="-20" y="-20" width="40" height="40" fill="#fff"/><circle cx="0" cy="-3.6" r="1.7" fill="#000"/>
+  ${s==='warn'?'<circle cx="6.6" cy="2.7" r="3.7" fill="#000" transform="rotate(-40)"/>':''}</mask></defs>
+  <g transform="translate(7 11.3) rotate(40)">
+    ${paused?`<rect x="-3.05" y="-6.95" width="6.1" height="13.3" rx="3.05" fill="none" stroke="currentColor" stroke-width="1.3" opacity=".55"/>`
+      :`<g mask="url(#${id})" transform="translate(0 0)"><rect x="-3.7" y="-7.6" width="7.4" height="14.6" rx="3.7" fill="currentColor"/></g>`}
+    ${paused?'':`<path d="M-2.5 -9.9A4.4 4.4 0 0 1 2.5 -9.9" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />`}
+    ${live?`<path d="M-3 -11.4A6 6 0 0 1 3 -11.4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" opacity=".6"/>`:''}
+  </g>${s==='warn'?'<circle cx="13.6" cy="14" r="2.5" fill="#E08A00"/>':''}${paused?'<path d="M3.5 3.5l11 11" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>':''}</svg>`;
+}
+document.querySelectorAll('.gl').forEach(e=>e.innerHTML=glyph(e.dataset.g));
+glyphs.innerHTML=[['idle','平时'],['live','正在听'],['paused','已暂停'],['warn','需要处理']].map(([s,n])=>`<figure><div class="bx">${glyph(s)}</div>${n}</figure>`).join('');
+
+// ---------- tokens ----------
+sw.innerHTML=[['纸','#F4F0E6','#1C1916'],['墨','#1C1916','#F4F0E6'],['朱砂 · 语音','#D5402B','#fff'],['松绿 · 正常','#3C7A5A','#fff'],['藤黄 · 提醒','#B57A12','#fff'],['夜 · 深色底','#161513','#EEE8DB']]
+  .map(([n,c,t])=>`<div style="background:${c};color:${t}"><b>${n}</b><span>${c}</span></div>`).join('');
+
+// ---------- key table ----------
+const KEYS=[['voice','语音键','语音输入',1],['power','电源','F20（可自定义）'],['ring','方向环','方向键'],['ok','确认','回车'],['back','返回','交给系统'],['home','主页','交给系统'],['menu','菜单','交给系统'],['vol','音量 + −','系统音量'],['tv','电视','交给系统']];
+keyrows.innerHTML=KEYS.map(([k,n,a,v])=>`<div class="row" data-k="${k}"><span class="k">${n}</span><div class="r">${v?'<i class="dot zhu"></i>':''}${a} ›</div></div>`).join('');
+const selKey=k=>{document.querySelectorAll('#rm2 .key,#keyrows .row').forEach(e=>e.classList.toggle('sel',e.dataset.k===k))};
+rm2.addEventListener('mouseover',e=>e.target.dataset.k&&selKey(e.target.dataset.k));
+keyrows.addEventListener('mouseover',e=>{const r=e.target.closest('.row');r&&selKey(r.dataset.k)});
+selKey('voice');
+
+// ---------- states ----------
+const q=new URLSearchParams(location.search), STILL=q.has('still');
+// Cold start: the five things to do, in order. cur is the one being done.
+const SETUP=[
+  ['连接遥控器','已连接 · 82%','等你点继续','遥指用蓝牙连接遥控器并接收语音。点“继续”后，macOS 会问是否允许遥指使用蓝牙。<br>还没配对过的话：打开“系统设置 → 蓝牙”，同时长按遥控器的主页键和菜单键，在列表里点连接。','<button class="btn fill">继续</button><button class="btn">打开蓝牙设置</button>','继续'],
+  ['安装 BlackHole 2ch','已安装 · yaozhi-mic 已就绪','未安装','开源的虚拟声卡，遥指通过它把声音送给输入法。装原版就行，遥指不改它，也不改系统默认麦克风。装好后遥指会自动发现。<br><code>brew install blackhole-2ch</code>','<button class="btn fill">复制命令</button><button class="btn">打开下载页</button>','复制命令'],
+  ['安装 Typeless','运行中','未安装','遥指不识别语音，文字由 Typeless 写出来。装好并打开它之后，这一步会自己打勾。<br><code>brew install typeless</code>','<button class="btn fill">复制命令</button><button class="btn">打开 Typeless 官网</button>','复制命令'],
+  ['允许辅助功能','已允许','未允许','Typeless 用 Fn 开始和结束听写。遥指要在你按住、松开语音键时替你点这一下 Fn，需要“辅助功能”权限。遥指只发 Fn，不读取你的按键。','<button class="btn fill">去授权</button>','去授权'],
+  ['选麦克风，说一句','已出字','等你说话','在 Typeless 的菜单栏图标 →“选择麦克风”里选 yaozhi-mic，然后按住语音键说一句。',null,''],
+];
+function setSetup(n){
+  win.dataset.setup=n; win.dataset.state=n<5?'blocked':'ready';
+  setuphead.textContent=n>5?'准备好了。':`还差 ${6-n} 步。`;
+  steps.innerHTML=SETUP.map(([t,done,todo,body,acts],i)=>{
+    const k=i+1, cls=k<n?'ok':k===n?'cur':'', tr=tryInner('ready');
+    return `<div class="stp ${cls}"><div class="hd"><span class="n">${k<n?'✓':k}</span><span class="t">${t}</span><span class="st">${k<n?done:k===n?todo:''}</span></div>
+      <div class="bd">${body}${acts?`<div class="acts">${acts}</div>`:`<div class="${tr.cls}"><div class="tryhd">试一试</div><div class="trytext">${tr.text}</div><div class="wave">${'<i></i>'.repeat(58)}</div></div>`}</div></div>`}).join('');
+  if(n>5){
+    const t=tryInner('done');
+    steps.lastElementChild.insertAdjacentHTML('beforeend',`<div class="bd" style="display:block"><div class="${t.cls}"><div class="tryhd">试一试${t.note}<button>清空</button></div><div class="trytext">今天天气不错。<span class="caret"></span></div><div class="wave">${'<i></i>'.repeat(58)}</div></div></div>`);
+    steps.insertAdjacentHTML('beforeend','<p style="font-size:13px;color:var(--ink2);margin:14px 0 12px;line-height:1.55">以后随时按住语音键说话，文字会出现在光标所在的地方。关掉窗口后，遥指留在菜单栏里。</p><button class="btn fill">开始使用</button>');
+    barmsg.textContent='全部准备好了'; bart.textContent='五步都完成了'; baract.textContent='开始使用'; baract.style.display='block'; bardot.className='dot';
+  } else {
+  barmsg.textContent=`还差 ${6-n} 步`; bart.textContent=SETUP[n-1][0]; baract.textContent=SETUP[n-1][5]; baract.style.display=n<5?'block':'none';
+  bardot.className='dot warn';
+  }
+  document.querySelectorAll('#setupseg button').forEach(x=>x.classList.toggle('on',+x.dataset.v===n));
+  document.querySelectorAll('#state button').forEach(x=>x.classList.remove('on'));
+}
+if(STILL)document.head.insertAdjacentHTML('beforeend','<style>*{transition:none!important;animation:none!important}html{scroll-behavior:auto!important}</style>');
+const COPY={
+  ready:['按住，\n说话。','按住遥控器上的语音键说一句，松开，文字就出现在你正在输入的地方。','就绪 · 按住语音键说话',''],
+  listening:['正在听','说完松开就行。声音正送往 Typeless。','正在听',''],
+  draining:['收尾中','等最后一点声音送完，再通知 Typeless 结束。','收尾中…',''],
+  done:['写好了。','已交给 Typeless，文字在你的光标处。','已交给 Typeless','2.3 秒'],
+  blocked:['还差\n一步。','允许"辅助功能"后，遥指才能替你点一下 Typeless 的快捷键。','还差 1 步：允许辅助功能',''],
+};
+// The try box, for the window above and the four stills below.
+const SAMPLE='明天下午三点开会，记得带上季度报告。';
+const TRY={
+  ready:{cls:'focus',text:'',note:''},
+  listening:{cls:'live',text:'',note:'<i class="dot zhu"></i>正在听'},
+  draining:{cls:'live',text:'',note:'收尾中…'},
+  done:{cls:'focus',text:SAMPLE,note:'<i class="dot"></i>出字成功 · 2.3 秒',tone:'ok'},
+  miss:{cls:'miss',text:'',note:'<i class="dot warn"></i>没有收到文字',tone:'warn'},
+  blocked:{cls:'',text:'',note:''},
+};
+function tryInner(k){
+  const t=TRY[k], ph=k==='blocked'?'允许辅助功能后，就能在这里试。':'按住语音键，说一句“今天天气不错”，文字会出现在这里。';
+  return {cls:'try '+t.cls,
+    note:`<em class="${t.tone||''}">${t.note}</em>`,
+    text:(t.text||`<span style="color:var(--ink3)">${ph}</span>`)+(t.cls&&t.cls!=='miss'||t.text?'<span class="caret"></span>':'')};
+}
+tries.innerHTML=[['ready','<b>等你说话</b>：光标已经在框里，灰字提示怎么做，并给一句可以照着说的话。'],['listening','<b>正在听</b>：边框变红，底部的线跟着声音起伏。'],['done','<b>出字成功</b>：文字留在框里，右上角给出结果；第 5 步打勾，标题变成“准备好了。”，出现“开始使用”。'],['miss','<b>没有收到文字</b>：语音送出 3 秒后框里还是空的，这一步的说明改成去检查 Typeless 和它的麦克风，再说一句。']]
+  .map(([k,cap])=>{const t=tryInner(k);return `<figure><div class="${t.cls}"><div class="tryhd">试一试${t.note}${k==='done'?'<button>清空</button>':''}</div><div class="trytext">${t.text}</div><div class="wave">${Array.from({length:58},(_,i)=>`<i style="height:${k==='listening'?(3+Math.abs(Math.sin(i*.9)+Math.sin(i*.37))*8*Math.sin(i/58*Math.PI)).toFixed(1):2}px"></i>`).join('')}</div></div><figcaption>${cap}</figcaption></figure>`}).join('');
+abouticon.innerHTML=appIcon('ink');
+const N=58; wave.innerHTML='<i></i>'.repeat(N); const bars=[...wave.children];
+let state='ready',t0=0,raf=0,timers=[];
+function setState(s){
+  delete win.dataset.setup; baract.textContent='去授权'; baract.style.display='';
+  document.querySelectorAll('#setupseg button').forEach(x=>x.classList.remove('on'));
+  state=s; win.dataset.state=s;
+  const [h,p,m,t]=COPY[s]; headline.textContent=h; sub.textContent=p; barmsg.textContent=m; bart.textContent=t;
+  bardot.className='dot'+(s==='listening'?' zhu':s==='blocked'||s==='miss'?' warn':'');
+  const tr=tryInner(s); document.getElementById('try').className=tr.cls; trynote.outerHTML=tr.note.replace('<em','<em id="trynote"'); trytext.innerHTML=tr.text; tryclear.hidden=true;
+  const b=s==='blocked'; chipdot.className='dot'+(b?' warn':''); chiptxt.textContent=b?'还差 1 步':'一切就绪'; chipn.textContent=b?'4/5':'5/5';
+  axdot.className='dot'+(b?' warn':''); axtxt.textContent=b?'未允许 · 去授权':'已允许'; check.classList.remove('open');
+  document.querySelectorAll('#state button').forEach(x=>x.classList.toggle('on',x.dataset.v===s));
+  cancelAnimationFrame(raf);
+  if(s==='listening'){t0=performance.now()-(STILL?2700:0);tick()} else bars.forEach(x=>x.style.height='2px');
+}
+function tick(){
+  const t=(performance.now()-t0)/1000;
+  bars.forEach((x,i)=>{const e=Math.sin(i/N*Math.PI);const v=(Math.sin(t*7+i*.55)+Math.sin(t*11.3+i*.23)+Math.sin(t*3.1+i*1.1))/3;
+    x.style.height=(3+Math.abs(v)*58*e*(.72+.28*Math.sin(t*2.1)))+'px'});
+  const sec=Math.floor(t); bart.textContent='0:'+String(sec).padStart(2,'0');
+  if(!STILL)raf=requestAnimationFrame(tick);
+}
+const release=()=>{timers.forEach(clearTimeout);setState('draining');timers=[setTimeout(()=>setState('done'),450),setTimeout(()=>setState('ready'),2900)]};
+document.getElementById('state').onclick=e=>{if(e.target.dataset.v){timers.forEach(clearTimeout);setState(e.target.dataset.v)}};
+addEventListener('keydown',e=>{if(e.code==='Space'){e.preventDefault();if(!e.repeat&&state!=='listening'&&state!=='blocked'){timers.forEach(clearTimeout);setState('listening')}}});
+addEventListener('keyup',e=>{if(e.code==='Space'&&state==='listening')release()});
+rm.addEventListener('pointerdown',e=>{if(e.target.dataset.k==='voice'&&state!=='blocked')setState('listening')});
+addEventListener('pointerup',()=>{if(state==='listening'&&matchMedia('(hover:hover)').matches&&pointerHeld)release();pointerHeld=false});
+let pointerHeld=false; rm.addEventListener('pointerdown',e=>{pointerHeld=e.target.dataset.k==='voice'});
+chip.onclick=()=>check.classList.toggle('open');
+nav.onclick=e=>{const b=e.target.closest('button');if(!b)return;win.dataset.page=b.dataset.p;nav.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x===b))};
+theme.onclick=e=>{const v=e.target.dataset.v;if(!v)return;document.body.classList.toggle('dark',v==='dark');theme.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.v===v))};
+function fitWin(){const k=Math.min(1,fit.clientWidth/1040);win.style.transform=`scale(${k})`;fit.style.height=660*k+'px'}
+addEventListener('resize',fitWin); fitWin();
+if(q.get('theme')==='dark')document.body.classList.add('dark'),theme.querySelectorAll('button').forEach(x=>x.classList.toggle('on',x.dataset.v==='dark'));
+if(q.get('page'))nav.querySelector(`[data-p="${q.get('page')}"]`)?.click();
+setState(COPY[q.get('state')]?q.get('state'):'ready');
+setupseg.onclick=e=>{if(e.target.dataset.v){timers.forEach(clearTimeout);setSetup(+e.target.dataset.v)}};
+if(q.get('setup'))setSetup(+q.get('setup'));
+</script>
+</body>
+</html>

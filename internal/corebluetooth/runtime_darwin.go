@@ -80,6 +80,7 @@ var (
 	selCode                  = objc.RegisterName("code")
 	selLocalizedDescription  = objc.RegisterName("localizedDescription")
 	selInitWithDelegateQueue = objc.RegisterName("initWithDelegate:queue:options:")
+	selAuthorization         = objc.RegisterName("authorization")
 )
 
 func load() error {

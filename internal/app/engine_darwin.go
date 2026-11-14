@@ -10,6 +10,9 @@ package app
 import (
 	"context"
 	"errors"
+	"fmt"
+	"math"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -17,6 +20,7 @@ import (
 	"github.com/zJiaJun/yaozhi/internal/coreaudio"
 	"github.com/zJiaJun/yaozhi/internal/device"
 	"github.com/zJiaJun/yaozhi/internal/device/atvvble"
+	"github.com/zJiaJun/yaozhi/internal/macapp"
 	"github.com/zJiaJun/yaozhi/internal/macinput"
 	"github.com/zJiaJun/yaozhi/internal/voice"
 )
@@ -55,6 +59,14 @@ type Readiness struct {
 	BlackHole     bool   // the user installed BlackHole 2ch
 	Mic           bool   // yaozhi-mic is there (Yaozhi makes it)
 	MicErr        string // why Yaozhi could not make yaozhi-mic
+	// AXRevoked: Accessibility was granted while Yaozhi ran, and then
+	// turned off. Voice input is paused until it is granted again.
+	AXRevoked bool
+	// InputInstalled and InputRunning: the input method's app is on this
+	// Mac, and running. Both are true for a preset that does not name its
+	// app, which cannot be checked.
+	InputInstalled bool
+	InputRunning   bool
 }
 
 // Steps counts the three steps done: Bluetooth, Accessibility, and the
@@ -88,6 +100,25 @@ type State struct {
 	LastAudio  time.Duration // speech in the latest finished stream
 	Count      int           // streams finished since launch
 	Problem    string        // why the latest stream failed
+
+	Stats Stats // today's numbers, kept across launches
+
+	// What the user chose (Settings), and what was once seen to work:
+	// text arriving from the input method, and a remote connected.
+	Paused     bool
+	GainDB     float64
+	TextSeen   bool
+	RemoteSeen bool
+
+	// NeedsStart: the user was never asked about Bluetooth, and Yaozhi
+	// waits for Begin before it makes the system ask.
+	NeedsStart bool
+
+	// What the connected remote told about itself. Battery is its charge
+	// in percent, meaningful while BatteryKnown.
+	Model        string
+	Battery      int
+	BatteryKnown bool
 }
 
 // Options configures an Engine.
@@ -95,6 +126,10 @@ type Options struct {
 	Devices   []device.Descriptor
 	Preset    voice.Preset
 	AcceptAny bool
+	// StatsFile keeps Stats across launches; "" keeps them in memory only.
+	StatsFile string
+	// SettingsFile keeps Settings across launches, likewise.
+	SettingsFile string
 	// Logf receives diagnostics, never audio or text. nil discards them.
 	Logf func(format string, args ...any)
 }
@@ -110,11 +145,21 @@ type Engine struct {
 
 	session atomic.Pointer[voice.Session] // nil until BlackHole is there
 	recheck chan struct{}
+	begin   chan struct{} // closed by Begin
+	blocker *keyBlocker
 
-	// Used by checkLoop only, and RemoveMic.
-	micMu      sync.Mutex
-	micRemoved bool      // the user removed yaozhi-mic: do not make it again
-	micTried   time.Time // the latest failed attempt, to retry slowly
+	paused atomic.Bool   // Settings.Paused, read on the device's I/O path
+	gain   atomic.Uint64 // Settings.GainDB, a float64's bits
+	open   atomic.Bool   // a voice stream is being passed on to the session
+
+	// The loudness of the latest audio frame, for the UI's meter: a
+	// float32's bits, and when it came (UnixNano).
+	level   atomic.Uint32
+	levelAt atomic.Int64
+
+	// Used by checkLoop only: the latest failed attempt at making
+	// yaozhi-mic, to retry slowly.
+	micTried time.Time
 }
 
 // New returns an engine; Run starts it.
@@ -123,7 +168,138 @@ func New(o Options) *Engine {
 	if logf == nil {
 		logf = func(string, ...any) {}
 	}
-	return &Engine{opts: o, logf: logf, recheck: make(chan struct{}, 1)}
+	e := &Engine{opts: o, logf: logf, recheck: make(chan struct{}, 1), begin: make(chan struct{})}
+	e.st.Stats = loadStats(o.StatsFile).on(time.Now())
+	set := loadSettings(o.SettingsFile)
+	e.st.Paused, e.st.GainDB, e.st.TextSeen, e.st.RemoteSeen = set.Paused, set.GainDB, set.TextSeen, set.RemoteSeen
+
+	e.paused.Store(set.Paused)
+	e.gain.Store(math.Float64bits(set.GainDB))
+	e.blocker = newKeyBlocker(!set.Paused, logf)
+	return e
+}
+
+// SetPaused turns voice input off (true) or back on. Off, the voice key
+// goes back to the system and nothing reaches the input method; a stream
+// in progress ends at once.
+func (e *Engine) SetPaused(paused bool) {
+	if e.paused.Swap(paused) == paused {
+		return
+	}
+	e.blocker.enable(!paused)
+	if paused && e.open.Swap(false) {
+		end := device.VoiceEnded{Interrupted: true}
+		if s := e.session.Load(); s != nil {
+			s.Handle(end)
+		}
+		e.deviceEvent(end)
+	}
+	e.update(func(s *State) { s.Paused = paused })
+	e.logf("语音输入%s", map[bool]string{true: "已暂停", false: "已启用"}[paused])
+	e.saveSettings()
+}
+
+// SetGain sets how much louder the voice is made, in dB from 0 to
+// voice.MaxGainDB.
+func (e *Engine) SetGain(db float64) {
+	db = Settings{GainDB: db}.valid().GainDB
+	if math.Float64frombits(e.gain.Swap(math.Float64bits(db))) == db {
+		return
+	}
+	e.update(func(s *State) { s.GainDB = db })
+	e.saveSettings()
+}
+
+// Begin lets Yaozhi use Bluetooth for the first time, which makes the
+// system ask the user: call it once the user was told what for. It does
+// nothing when the user was asked before.
+func (e *Engine) Begin() {
+	e.mu.Lock()
+	select {
+	case <-e.begin:
+	default:
+		close(e.begin)
+	}
+	e.mu.Unlock()
+	e.update(func(s *State) { s.NeedsStart = false })
+}
+
+// NoteText records that text arrived from the input method where the UI
+// could see it. The UI tells only that, not the text.
+func (e *Engine) NoteText() {
+	if e.State().TextSeen {
+		return
+	}
+	e.update(func(s *State) { s.TextSeen = true })
+	e.logf("第一次在遥指里看到出字")
+	e.saveSettings()
+}
+
+func (e *Engine) saveSettings() {
+	st := e.State()
+	set := Settings{Paused: st.Paused, GainDB: st.GainDB, TextSeen: st.TextSeen, RemoteSeen: st.RemoteSeen}
+	if err := saveJSON(e.opts.SettingsFile, set); err != nil {
+		e.logf("保存设置失败：%v", err)
+	}
+}
+
+// Diagnostics describes what Yaozhi sees, for a report: its state and the
+// audio devices, never audio or text.
+func (e *Engine) Diagnostics() string {
+	st := e.State()
+	var b strings.Builder
+	yes := map[bool]string{true: "是", false: "否"}
+	fmt.Fprintf(&b, "输入法预设：%s（%s，%s）\n", e.opts.Preset.Name, e.opts.Preset.Trigger.Key, e.opts.Preset.Trigger.Mode)
+	fmt.Fprintf(&b, "语音输入：暂停=%s 增益=%+.0f dB\n", yes[st.Paused], st.GainDB)
+	fmt.Fprintf(&b, "遥控器：%s 名称=%q 型号=%q", st.Conn, st.Device, st.Model)
+	if st.BatteryKnown {
+		fmt.Fprintf(&b, " 电量=%d%%", st.Battery)
+	}
+	if st.ConnErr != "" {
+		fmt.Fprintf(&b, " 上次断开=%s", st.ConnErr)
+	}
+	r := st.Ready
+	fmt.Fprintf(&b, "\n权限：蓝牙=%s 辅助功能=%s（被关闭过=%s）\n",
+		map[Perm]string{PermUnknown: "未知", PermGranted: "已允许", PermDenied: "已拒绝"}[r.Bluetooth], yes[r.Accessibility], yes[r.AXRevoked])
+	fmt.Fprintf(&b, "虚拟麦克风：BlackHole=%s %s=%s %s\n", yes[r.BlackHole], MicName, yes[r.Mic], r.MicErr)
+	fmt.Fprintf(&b, "输入法 App：%s 已安装=%s 运行中=%s；在遥指里出过字=%s\n", e.opts.Preset.App.BundleID, yes[r.InputInstalled], yes[r.InputRunning], yes[st.TextSeen])
+	fmt.Fprintf(&b, "统计：今天 %d 次，平均 %.1f 秒，松开后 %d ms；累计 %d 次\n",
+		st.Stats.Today, st.Stats.AvgAudio().Seconds(), st.Stats.AvgLatency().Milliseconds(), st.Stats.Total)
+	b.WriteString("音频设备：\n")
+	devs, err := coreaudio.Devices()
+	if err != nil {
+		fmt.Fprintf(&b, "  读取失败：%v\n", err)
+	}
+	for _, d := range devs {
+		fmt.Fprintf(&b, "  %s（%s）输入 %d 输出 %d 声道\n", d.Name, d.UID, d.InputChannels, d.OutputChannels)
+	}
+	return b.String()
+}
+
+// Level is how loud the voice is now, from 0 (silence, or no voice
+// stream) to 1, for a meter. It is read often: it takes no lock.
+func (e *Engine) Level() float32 {
+	if time.Since(time.Unix(0, e.levelAt.Load())) > 150*time.Millisecond {
+		return 0
+	}
+	return math.Float32frombits(e.level.Load())
+}
+
+// noteLevel measures a frame of audio: its RMS in dBFS, from -55 dB to
+// -10 dB mapped onto 0 to 1. Only the loudness is kept, never the audio.
+func (e *Engine) noteLevel(pcm []int16) {
+	if len(pcm) == 0 {
+		return
+	}
+	var sum float64
+	for _, v := range pcm {
+		f := float64(v) / 32768
+		sum += f * f
+	}
+	db := 10 * math.Log10(sum/float64(len(pcm))+1e-12)
+	l := float32(math.Max(0, math.Min(1, (db+55)/45)))
+	e.level.Store(math.Float32bits(l))
+	e.levelAt.Store(time.Now().UnixNano())
 }
 
 // State returns the current state.
@@ -161,10 +337,10 @@ func (e *Engine) update(f func(s *State)) {
 
 func (e *Engine) setVoice(p VoicePhase, f func(s *State)) {
 	e.update(func(s *State) {
-		s.Voice, s.VoiceSince = p, time.Now()
 		if f != nil {
-			f(s)
+			f(s) // sees the phase before
 		}
+		s.Voice, s.VoiceSince = p, time.Now()
 	})
 }
 
@@ -174,20 +350,54 @@ func (e *Engine) Run(ctx context.Context) error {
 	var wg sync.WaitGroup
 	defer wg.Wait()
 
-	blocker := newKeyBlocker(e.logf)
-	wg.Go(func() { blocker.run(ctx) })
+	wg.Go(func() { e.blocker.run(ctx) })
 	wg.Go(func() { e.checkLoop(ctx) })
 	wg.Go(func() { e.voiceLoop(ctx) })
 	wg.Go(func() { e.idleLoop(ctx) })
+
+	// The first use of Bluetooth makes the system ask the user. On the
+	// very first launch that waits until the user was told what for.
+	if !atvvble.Asked() {
+		e.update(func(s *State) { s.NeedsStart = true })
+		e.logf("还没问过蓝牙权限，等用户点继续")
+		select {
+		case <-e.begin:
+		case <-ctx.Done():
+			return nil
+		}
+	}
 
 	a := atvvble.New(e.opts.Devices)
 	a.AcceptAny = e.opts.AcceptAny
 	a.Logf = e.logf
 	err := a.Run(ctx, func(ev device.Event) {
+		// Only streams that started while voice input could work are
+		// passed on, whole: pausing ends the one in progress (SetPaused),
+		// and one in progress when it resumes is left alone. Without the
+		// permission to press the input method's shortcut a stream has
+		// nowhere to go, and the UI already says what is missing: showing
+		// it listening would promise text that cannot come.
+		switch ev := ev.(type) {
+		case device.VoiceStarted:
+			if e.paused.Load() || e.session.Load() == nil || !e.State().Ready.Accessibility {
+				return
+			}
+			e.open.Store(true)
+		case device.VoiceAudio:
+			if !e.open.Load() {
+				return
+			}
+			voice.Gain(ev.PCM, math.Float64frombits(e.gain.Load()))
+			e.noteLevel(ev.PCM)
+		case device.VoiceEnded:
+			if !e.open.Swap(false) {
+				return
+			}
+		}
 		if s := e.session.Load(); s != nil {
 			s.Handle(ev)
 		}
-		e.deviceEvent(ev, blocker)
+		e.deviceEvent(ev)
 	})
 	if errors.Is(err, atvvble.ErrUnauthorized) {
 		e.update(func(s *State) { s.Ready.Bluetooth = PermDenied })
@@ -198,7 +408,7 @@ func (e *Engine) Run(ctx context.Context) error {
 	return err
 }
 
-func (e *Engine) deviceEvent(ev device.Event, blocker *keyBlocker) {
+func (e *Engine) deviceEvent(ev device.Event) {
 	switch ev := ev.(type) {
 	case device.StateChanged:
 		name := ev.Name
@@ -221,14 +431,37 @@ func (e *Engine) deviceEvent(ev device.Event, blocker *keyBlocker) {
 			if ev.State != device.StateReady && (s.Voice == VoiceListening) {
 				s.Voice, s.VoiceSince = VoiceIdle, time.Now()
 			}
+			if ev.State == device.StateSearching || ev.State == device.StateUnavailable {
+				s.Battery, s.BatteryKnown = 0, false // as of the last connection
+			}
 		})
 		if ev.State == device.StateReady {
-			blocker.block(ev.Device)
+			e.blocker.block(ev.Device)
+			if !e.State().RemoteSeen {
+				e.update(func(s *State) { s.RemoteSeen = true })
+				e.saveSettings()
+			}
 		}
+	case device.InfoChanged:
+		e.update(func(s *State) {
+			if ev.Model != "" {
+				s.Model = ev.Model
+			}
+			if ev.Battery >= 0 {
+				s.Battery, s.BatteryKnown = ev.Battery, true
+			}
+		})
 	case device.VoiceStarted:
 		e.setVoice(VoiceListening, func(s *State) { s.Problem = "" })
 	case device.VoiceEnded:
-		e.setVoice(VoiceEnding, nil)
+		// Only a stream still listening goes on to end: one that already
+		// failed stays failed, and no session event would ever take it
+		// out of VoiceEnding.
+		e.update(func(s *State) {
+			if s.Voice == VoiceListening {
+				s.Voice, s.VoiceSince = VoiceEnding, time.Now()
+			}
+		})
 	}
 }
 
@@ -238,7 +471,20 @@ func (e *Engine) sessionEvent(ev voice.Event) {
 	case voice.Dropped:
 		e.setVoice(VoiceIdle, nil)
 	case voice.Finished:
-		e.setVoice(VoiceDone, func(s *State) { s.LastAudio = ev.Audio; s.Count++ })
+		var stats Stats
+		e.setVoice(VoiceDone, func(s *State) {
+			var latency time.Duration
+			if s.Voice == VoiceEnding {
+				latency = time.Since(s.VoiceSince)
+			}
+			s.LastAudio = ev.Audio
+			s.Count++
+			s.Stats = s.Stats.add(time.Now(), ev.Audio, latency)
+			stats = s.Stats
+		})
+		if err := saveStats(e.opts.StatsFile, stats); err != nil {
+			e.logf("保存统计失败：%v", err)
+		}
 	case voice.Failed:
 		msg := ev.Err.Error()
 		if errors.Is(ev.Err, macinput.ErrNotTrusted) {
@@ -258,7 +504,12 @@ func (e *Engine) idleLoop(ctx context.Context) {
 			return
 		case <-t.C:
 			st := e.State()
-			hold := map[VoicePhase]time.Duration{VoiceDone: 2600 * time.Millisecond, VoiceFailed: 5 * time.Second}[st.Voice]
+			if today := st.Stats.on(time.Now()); today != st.Stats {
+				e.update(func(s *State) { s.Stats = s.Stats.on(time.Now()) }) // past midnight
+			}
+			// VoiceEnding ends with the session's word; should that never
+			// come, it does not stay for ever.
+			hold := map[VoicePhase]time.Duration{VoiceDone: 2600 * time.Millisecond, VoiceFailed: 5 * time.Second, VoiceEnding: 8 * time.Second}[st.Voice]
 			if hold > 0 && time.Since(st.VoiceSince) > hold {
 				e.update(func(s *State) {
 					if s.Voice == st.Voice && s.VoiceSince == st.VoiceSince {
@@ -293,16 +544,35 @@ func (e *Engine) checkLoop(ctx context.Context) {
 	defer tick.Stop()
 	var lastDevices time.Time
 	checkDevices := true
+	first, wasAX := true, false
 	for {
 		ax, _ := macinput.CanPostEvents()
+		if first || ax != wasAX {
+			e.logf("辅助功能：%s", map[bool]string{true: "已允许", false: "未允许"}[ax])
+			first, wasAX = false, ax
+		}
 		st := e.State().Ready
 		bh, mic, micErr := st.BlackHole, st.Mic, st.MicErr
 		if checkDevices || !(bh && mic) || time.Since(lastDevices) > time.Minute {
 			bh, mic, micErr = e.checkMic()
 			lastDevices = time.Now()
 		}
+		// The input method's app: whether it runs is asked every time,
+		// whether it is installed only while it does not.
+		installed, running := true, true
+		if id := e.opts.Preset.App.BundleID; id != "" {
+			running = macapp.Running(id)
+			installed = running || macapp.Installed(id)
+		}
 		e.update(func(s *State) {
+			switch {
+			case ax:
+				s.Ready.AXRevoked = false
+			case s.Ready.Accessibility:
+				s.Ready.AXRevoked = true // granted a moment ago
+			}
 			s.Ready.Accessibility, s.Ready.BlackHole, s.Ready.Mic, s.Ready.MicErr = ax, bh, mic, micErr
+			s.Ready.InputInstalled, s.Ready.InputRunning = installed, running
 		})
 		checkDevices = false
 		select {
@@ -330,11 +600,6 @@ func (e *Engine) checkMic() (blackHole, mic bool, micErr string) {
 	case micOurs, micTheirs:
 		return true, true, ""
 	}
-	e.micMu.Lock()
-	defer e.micMu.Unlock()
-	if e.micRemoved {
-		return true, false, "已移除，重新打开遥指后会再创建"
-	}
 	if !e.micTried.IsZero() && time.Since(e.micTried) < 30*time.Second {
 		return true, false, "创建失败，稍后重试"
 	}
@@ -347,20 +612,6 @@ func (e *Engine) checkMic() (blackHole, mic bool, micErr string) {
 	e.micTried = time.Time{}
 	e.logf("已创建 %s（%s，输入 %d 声道）", d.Name, d.UID, d.InputChannels)
 	return true, true, ""
-}
-
-// RemoveMic removes the yaozhi-mic Yaozhi made (not one the user made) and
-// stops making it again until the next launch. For leaving Yaozhi behind.
-func (e *Engine) RemoveMic() error {
-	e.micMu.Lock()
-	e.micRemoved = true
-	e.micMu.Unlock()
-	err := coreaudio.DestroyAggregate(MicUID)
-	if err == nil {
-		e.logf("已移除 %s", MicName)
-	}
-	e.Recheck()
-	return err
 }
 
 // voiceLoop starts the voice session once BlackHole is installed.

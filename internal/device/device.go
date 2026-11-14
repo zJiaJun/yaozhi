@@ -32,8 +32,8 @@ type Device interface {
 	Run(ctx context.Context, emit func(Event)) error
 }
 
-// Event is one of StateChanged, KeyChanged, VoiceStarted, VoiceAudio or
-// VoiceEnded.
+// Event is one of StateChanged, InfoChanged, KeyChanged, VoiceStarted,
+// VoiceAudio or VoiceEnded.
 type Event interface{ event() }
 
 // State is the connection state of an adapter.
@@ -78,6 +78,16 @@ type StateChanged struct {
 	Err error
 }
 
+// InfoChanged reports what the connected device tells about itself. It
+// comes after StateChanged, once per fact learned, each time with all that
+// is known so far; a device that tells nothing sends none.
+type InfoChanged struct {
+	// Model is the device's model number ("RC003"), "" while unknown.
+	Model string
+	// Battery is the charge left in percent, -1 while unknown.
+	Battery int
+}
+
 // KeyChanged reports a key going down or up. Key is a name from the
 // descriptor's [keys] table.
 type KeyChanged struct {
@@ -104,6 +114,7 @@ type VoiceEnded struct {
 }
 
 func (StateChanged) event() {}
+func (InfoChanged) event()  {}
 func (KeyChanged) event()   {}
 func (VoiceStarted) event() {}
 func (VoiceAudio) event()   {}
