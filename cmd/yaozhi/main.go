@@ -14,6 +14,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -70,6 +71,27 @@ func main() {
 	pretend := flag.String("pretend", "", "假装缺少一些东西，用来看首次启动的引导：all，或用逗号隔开的 bluetooth、remote、blackhole、typeless、typeless-off、ax、text")
 	flag.Parse()
 
+	// One Yaozhi at a time. Another of this same build takes this launch
+	// for a click on its icon and shows its window (OnSecondInstance
+	// below); the other build, release or development, is told apart by
+	// the lock both share, and this one stops before it touches anything.
+	mygo.App.SetName("Yaozhi")
+	if !mygo.App.RequestSingleInstanceLock() {
+		return
+	}
+	if dir := supportDir(); dir != "" {
+		unlock, other, err := app.LockInstance(filepath.Join(dir, "running.lock"), holder())
+		switch {
+		case errors.Is(err, app.ErrRunning):
+			alreadyRunning(other)
+			return
+		case err != nil:
+			logf("没能检查是否已有遥指在运行：%v", err)
+		default:
+			defer unlock() // keeps the lock's file open until Yaozhi quits
+		}
+	}
+
 	descs, err := device.Catalog(filepath.Join(supportDir(), "devices"))
 	if err != nil {
 		logf("跳过了有问题的设备描述：%v", err)
@@ -91,11 +113,54 @@ func main() {
 	s := &shell{eng: eng, preset: presets[i], launched: time.Now(), page: pageOverview, selKey: "voice", pretend: parsePretend(*pretend)}
 	eng.OnChange(s.changed)
 
-	mygo.App.SetName("Yaozhi")
+	mygo.App.OnSecondInstance(func([]string, string) {
+		if s.win != nil {
+			s.showWindow()
+		}
+	})
 	mygo.App.OnWindowAllClosed(func() {}) // lives on in the menu bar
 	mygo.App.WhenReady(s.ready)
 	mygo.App.OnBeforeQuit(func(*mygo.QuitEvent) { s.quitting = true })
 	mygo.App.OnWillQuit(func(*mygo.QuitEvent) { s.stop() })
+	if err := mygo.App.Run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+// holder is what this Yaozhi writes into the instance lock for another
+// to tell the user: where its app bundle is, and its process.
+func holder() string {
+	where := "遥指"
+	if exe, err := os.Executable(); err == nil {
+		if i := strings.Index(exe, ".app/Contents/MacOS/"); i >= 0 {
+			where = exe[:i+len(".app")]
+		} else {
+			where = exe
+		}
+	}
+	return fmt.Sprintf("%s（进程 %d）", where, os.Getpid())
+}
+
+// alreadyRunning tells the user that another Yaozhi runs, and quits. It
+// starts neither the engine nor the menu bar icon: this one never takes
+// the remote.
+func alreadyRunning(other string) {
+	if other == "" {
+		other = "另一个遥指"
+	}
+	logf("已有遥指在运行：%s", other)
+	mygo.App.WhenReady(func() {
+		mygo.App.SetActivationPolicy(mygo.ActivationPolicyRegular)
+		go func() {
+			_, _ = mygo.Dialog.Message(mygo.MessageOptions{
+				Type:    mygo.MessageWarning,
+				Message: "遥指已经在运行",
+				Detail: other + " 正在运行。两个遥指同时运行会争用遥控器，按住说话会失效。\n\n" +
+					"请先在菜单栏退出它，再打开这一个。",
+			})
+			mygo.App.Quit()
+		}()
+	})
 	if err := mygo.App.Run(); err != nil {
 		log.Fatal(err)
 	}

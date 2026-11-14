@@ -100,7 +100,7 @@ make yaozhi
 scripts/yaozhi.sh
 ```
 
-`make yaozhi` 打包出 `build/darwin-arm64/Yaozhi.app`，`scripts/yaozhi.sh` 启动它并把日志接到当前终端；`make dmg` 另外打出磁盘映像。
+`make yaozhi` 打包出开发版 `build/darwin-arm64/Yaozhi.app`（名字是 Yaozhi Dev，bundle ID 和发布版不同，两者的授权互不影响），`scripts/yaozhi.sh` 启动它并把日志接到当前终端；`make dmg` 打包发布版并打出磁盘映像。同一时间只能运行一个遥指，运行开发版前先在菜单栏退出发布版。
 
 > [!IMPORTANT]
 > 不能直接运行编译出来的二进制。macOS 要求访问蓝牙的程序在 `Info.plist` 里写明用途，直接运行会被系统杀掉（退出码 134，没有输出）。

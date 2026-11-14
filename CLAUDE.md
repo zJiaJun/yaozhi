@@ -13,7 +13,7 @@
 
 ```bash
 make check          # gofmt 检查、go vet、go test -race；提交前必须通过
-make yaozhi         # 打包 build/darwin-arm64/Yaozhi.app
+make yaozhi         # 打包开发版 build/darwin-arm64/Yaozhi.app（bundle ID 加 .dev，名字 Yaozhi Dev）
 make dmg            # 同上，另外打出 dmg
 scripts/yaozhi.sh   # 启动 App，日志接到终端；可加 -preset、-any、-pretend
 make screenshots    # 更新 docs/screenshots（README 用）
@@ -54,7 +54,7 @@ make icon           # 重画 resources/icon.png
 - **聚集设备 `yaozhi-mic`**：由遥指自动创建，只含 BlackHole 2ch、固定 UID、公开可见；每次启动检查，缺了就重建；已有同名且只含 BlackHole 的设备直接用；不提供移除入口。首次引导要提示用户在 Typeless 里选它。
 - **输入法**：Typeless 用 Fn"点一下开始、再点一下结束"。遥指屏蔽遥控器语音键发出的 F5，自己模拟 Fn 点按；开头的音频先缓存，结束前等音频播完。豆包输入法不支持（它会隐藏虚拟音频设备）。
 - **隐私**：遥指不做语音识别，不保存、不上传音频，日志和诊断里不记录语音内容。按键监听只输出要测的键，不打印用户的其他按键。
-- **签名**：发布用的自签名证书 `Yaozhi Release` 不要重新生成或更换，换了所有用户都要重新授权；发布流程见 `docs/DEVELOPMENT.md` 的"发布"。
+- **签名**：发布用的自签名证书 `Yaozhi Release` 不要重新生成或更换，换了所有用户都要重新授权；发布版的 bundle ID 也不要改（开发版另用 `.dev`，见 `make yaozhi`）。发布流程见 `docs/DEVELOPMENT.md` 的"发布"。
 - **权限**：模拟按键要"辅助功能"，监听按键要"输入监控"（M2 才申请）。辅助功能每 2 秒检查一次 `AXIsProcessTrusted`，不处理用"−"删除的情况。
 
 ## 代码约定

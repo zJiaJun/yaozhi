@@ -16,9 +16,9 @@ make check
 | 命令 | 作用 |
 |---|---|
 | `make check` | gofmt 检查、`go vet`、`go test -race`，CI 跑的也是它 |
-| `make yaozhi` | 用 MyGo 打包成 `build/darwin-arm64/Yaozhi.app`（`CGO_ENABLED=0`） |
-| `make dmg` | 同上，另外打出 `yaozhi-<版本>-arm64.dmg` |
-| `scripts/yaozhi.sh [参数]` | 启动打包好的 App，日志接到当前终端，Ctrl-C 正常退出 |
+| `make yaozhi` | 用 MyGo 打包开发版 `build/darwin-arm64/Yaozhi.app`（`CGO_ENABLED=0`），bundle ID 是 `com.github.zjiajun.yaozhi.dev`，名字 "Yaozhi Dev" |
+| `make dmg` | 打包发布版（`mygo.json` 里的 bundle ID），另外打出 `yaozhi-<版本>-arm64.dmg` |
+| `scripts/yaozhi.sh [参数]` | 启动打包好的 App，日志接到当前终端；Ctrl-C 只让这个 App 正常退出，不影响"应用程序"里的发布版 |
 | `make icon` | 按 `internal/icon` 里的几何重画 `resources/icon.png` |
 | `make screenshots` | 无窗口渲染各页，更新 `docs/screenshots/` 里 README 用的截图 |
 
@@ -31,6 +31,8 @@ make yaozhi && scripts/yaozhi.sh
 ```
 
 没有终端时（例如在脚本里），用 `YAOZHI_LOG=<文件>` 指定日志输出。
+
+同一时间只能运行一个遥指：两个会争用遥控器、都去点 Fn，输入法刚开始就被结束。再次打开同一个版本时，已经在运行的那个显示主窗口；开发版和发布版之间靠 `~/Library/Application Support/Yaozhi/running.lock` 判断，后打开的那个弹窗说明谁在运行，然后退出，不会碰遥控器。所以开发前先在菜单栏退出发布版。
 
 启动参数：
 
@@ -46,6 +48,7 @@ make yaozhi && scripts/yaozhi.sh
 |---|---|
 | `settings.json` | 暂停开关、音量增益、引导进度（只记是否完成，不记文字） |
 | `stats.json` | 使用次数和时长 |
+| `running.lock` | 正在运行的遥指（路径和进程号），用来防止两个同时运行 |
 | `devices/*.toml` | 用户自己的设备描述，和内置的合并，`id` 相同时替换内置的 |
 | `presets/*.toml` | 用户自己的输入法预设，规则同上 |
 | `diagnostics/` | "设备"页"导出诊断"写出的文件 |
@@ -69,7 +72,9 @@ macOS 记住隐私授权时，存的是 App 的签名要求。临时签名（`co
 1. 打开"钥匙串访问"，选"证书助理 → 创建证书"。
 2. 名称填 `yaozhi-dev`，身份类型选"自签名根证书"，证书类型选"代码签名"。不需要设为信任。
 
-`make yaozhi` 发现钥匙串里有这张证书就用它签名（带 hardened runtime 和时间戳），没有就退回临时签名；也可以用 `make yaozhi SIGN=<身份>` 指定。从临时签名换成证书签名后要再授权一次，并删掉列表里旧的 Yaozhi。这张证书只在本机有效；发布用的是另一张证书，见下面的"发布"。
+`make yaozhi` 发现钥匙串里有这张证书就用它签名（带 hardened runtime），没有就退回临时签名；也可以用 `make yaozhi SIGN=<身份>` 指定。从临时签名换成证书签名后要再授权一次，并删掉列表里旧的 Yaozhi。这张证书只在本机有效；发布用的是另一张证书，见下面的"发布"。
+
+开发版和发布版的 bundle ID 不同（开发版多一个 `.dev`），系统把它们当成两个 App，各自记住授权，同一台 Mac 上来回切换不用重新授权；代价是两个都要各授权一次，蓝牙和辅助功能列表里会同时有 Yaozhi 和 Yaozhi Dev。`make yaozhi` 在 MyGo 打包后改 `Info.plist` 里的 bundle ID 和名字，再重新签名。
 
 ## 发布
 

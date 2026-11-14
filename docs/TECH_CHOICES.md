@@ -40,7 +40,8 @@
 | 输入法抽象 | 一个通用实现 + TOML 预设 | 每个输入法一个插件 |
 | 辅助功能检测 | 每 2 秒问 `AXIsProcessTrusted` | 预检接口、子进程复查、监听 TCC 通知 |
 | 菜单栏 | 系统菜单 | 自绘弹出面板 |
-| 签名 | 开发用本机自签名证书 `yaozhi-dev`，发布用自签名证书 `Yaozhi Release` | 临时签名；暂不加入 Apple 开发者计划 |
+| 签名 | 开发用本机自签名证书 `yaozhi-dev` 和单独的 bundle ID，发布用自签名证书 `Yaozhi Release` | 临时签名；暂不加入 Apple 开发者计划 |
+| 多开 | 同一时间只运行一个：同版本用 MyGo 的单实例锁，开发版和发布版之间用共享的文件锁 | 不限制 |
 
 ## 决定和原因
 
@@ -107,10 +108,14 @@ MyGo 的弹出面板（Popover）会先激活整个 App，开着的主窗口会�
 
 macOS 按签名要求记住隐私授权。临时签名的签名要求是代码哈希，每次重新编译都要重新授权；用证书签名时签名要求是"bundle ID + 证书"，和代码无关。
 
-- 开发：本机自签名证书 `yaozhi-dev`，重新编译不用重新授权。
+- 开发：本机自签名证书 `yaozhi-dev`，重新编译不用重新授权。bundle ID 加 `.dev`、名字是 "Yaozhi Dev"，和发布版在系统里算两个 App，同一台 Mac 上切换不会互相顶掉授权。
 - 发布：GitHub Actions 用另一张自签名证书 `Yaozhi Release`（存在 Secrets 里）给 Release 里的 App 签名，用户升级后授权保留。2026-11-14 在本机用临时钥匙串走过一遍导入、签名、打包：App 带 hardened runtime 和时间戳，签名要求是 `identifier "com.github.zjiajun.yaozhi" and certificate leaf = H"…"`。
 
 代价是没有公证：用户第一次打开要在"隐私与安全性"里手动放行。Developer ID（Apple 开发者计划，99 美元/年）能免掉这一步，以后再加；换证书会让所有用户重新授权一次。
+
+### 同一时间只运行一个
+
+两个遥指同时运行会都连遥控器、都屏蔽 F5、都模拟 Fn，Typeless 收到两次点按，刚开始就结束。再次打开同一个版本时，MyGo 的 `RequestSingleInstanceLock` 把这次启动转给已经在运行的那个，由它显示主窗口。这把锁按 bundle ID 区分，管不到开发版和发布版之间，所以另加一把两者共用的文件锁 `~/Library/Application Support/Yaozhi/running.lock`（`flock`，进程结束时系统自动释放，崩溃也不会留下死锁）：拿不到锁的那个弹窗说明谁在运行，然后退出，引擎和菜单栏都不启动。
 
 ## 实测数据
 

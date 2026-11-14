@@ -56,8 +56,10 @@
 ### 发布
 
 - [x] 本机签名：`yaozhi-dev` 自签名证书，重新编译不用重新授权
-- [x] GitHub Actions 打包 dmg：推送 `v*` 标签时用自签名证书 `Yaozhi Release` 签名，上传到草稿 Release（`.github/workflows/release.yml`；签名和打包在本机验证过，还没在 GitHub 上跑过）
-- [ ] 生成发布证书并存进 Secrets，推送仓库，发第一个 Release，在另一台 Mac 上验证下载、放行和升级后授权保留
+- [x] 开发版用单独的 bundle ID（`.dev`），和发布版各记各的授权；同一时间只运行一个遥指，开发版和发布版之间也一样
+- [x] GitHub Actions 打包 dmg：推送 `v*` 标签时用自签名证书 `Yaozhi Release` 签名，上传到草稿 Release（`.github/workflows/release.yml`）
+- [x] 生成发布证书并存进 Secrets，推送仓库，发布 v0.0.1（2026-11-14）
+- [ ] 验证下载、放行和升级后授权保留（装 v0.0.1，再升级到下一个版本）
 - [ ] Developer ID 签名和公证（加入 Apple 开发者计划后），用户不用再手动放行
 
 ### 验收

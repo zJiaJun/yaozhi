@@ -27,8 +27,16 @@ test:
 # 签名：钥匙串里有名为 yaozhi-dev 的代码签名证书就用它（自签名即可，见 docs/DEVELOPMENT.md"签名"），
 # 授权按 bundle ID + 证书认，重新编译不失效；没有就临时签名，每次重新编译都要重新授权。也可以 make yaozhi SIGN=<身份>。
 SIGN ?= $(shell security find-identity -p codesigning 2>/dev/null | grep -q '"yaozhi-dev"' && echo yaozhi-dev || echo -)
+# 开发版换成自己的 bundle ID 和名字 "Yaozhi Dev"，再重新签名：在系统里和发布版算两个 App，
+# 各记各的授权，同一台 Mac 上来回切换不用重新授权。发布版（make dmg）保持 mygo.json 里的 bundle ID。
+DEV_ID := $(shell plutil -extract identifier raw -o - mygo.json).dev
+DEV_APP := build/darwin-arm64/Yaozhi.app
 yaozhi:
 	CGO_ENABLED=0 $(GO) tool mygo build -skip-dmg -sign "$(SIGN)"
+	plutil -replace CFBundleIdentifier -string "$(DEV_ID)" $(DEV_APP)/Contents/Info.plist
+	plutil -replace CFBundleName -string "Yaozhi Dev" $(DEV_APP)/Contents/Info.plist
+	plutil -replace CFBundleDisplayName -string "Yaozhi Dev" $(DEV_APP)/Contents/Info.plist
+	codesign --force --options runtime --timestamp=none --sign "$(SIGN)" $(DEV_APP)
 
 # 发布用的磁盘映像 build/darwin-arm64/yaozhi-<版本>-arm64.dmg，连同里面的 App。签名身份同上，
 # GitHub Actions 发布时用 SIGN="Yaozhi Release"（见 docs/DEVELOPMENT.md"发布"）。
